@@ -1,0 +1,99 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.dp.roundtable",
+  "productName": "Roundtable",
+  "version": "0.1.0",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        "default",
+        "notification-capability",
+        {
+          "identifier": "window-capability",
+          "description": "Allows window state checks and badge functionality",
+          "local": true,
+          "windows": ["main"],
+          "permissions": [
+            "core:window:allow-is-minimized",
+            "core:window:allow-is-focused",
+            "core:window:allow-is-visible",
+            "core:window:allow-show",
+            "core:window:allow-hide",
+            "core:window:allow-minimize",
+            "core:window:allow-unminimize",
+            "core:window:allow-maximize",
+            "core:window:allow-unmaximize",
+            "core:window:allow-set-focus",
+            "core:window:allow-request-user-attention",
+            "core:window:allow-set-badge-count",
+            "core:window:allow-set-title",
+            "core:window:allow-set-badge-label",
+            "core:window:allow-set-icon",
+            "core:window:allow-set-overlay-icon",
+            "core:window:allow-set-progress-bar",
+            "core:window:default"
+          ]
+        },
+        {
+          "identifier": "fs-capability",
+          "description": "Allows file picking and metadata access for transfers",
+          "local": true,
+          "windows": ["main"],
+          "permissions": [
+            "dialog:default",
+            "core:path:allow-basename",
+            "core:path:default",
+            "core:path:allow-resolve-directory",
+            "fs:default",
+            "fs:allow-read-file",
+    "fs:allow-read-dir",
+    "fs:allow-exists",
+    "fs:allow-stat",
+    "fs:allow-write-file",
+            {
+              "identifier": "fs:scope",
+              "allow": ["$DOWNLOAD/*", "$HOME/Downloads/*"]
+            }
+          ]
+        }
+      ]
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Roundtable (by d.veloper)",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "decorations": false,
+        "transparent": true,
+        "resizable": true,
+        "center": true,
+        "focus": true,
+        "fullscreen": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "d.veloper",
+    "category": "Productivity",
+    "shortDescription": "Real-time decentralized chat app",
+    "longDescription": "Roundtable: A peer-to-peer chat application by d.veloper",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "identifier": "default",
+  "description": "Default permissions for the application",
+  "permissions": [
+    "core:window:allow-minimize",
+    "core:event:default",
+    "core:event:allow-listen",
+    "core:window:allow-maximize", 
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging"
+  ],
+  "windows": ["main"],
+  "platforms": ["linux", "macOS", "windows"],
+  "context": {
+    "allow": [
+      { "url": "http://localhost:*" },
+      { "url": "http://127.0.0.1:*" },
+      { "url": "https://tauri.localhost/*" },
+      { "url": "tauri://*" }
+    ]
+  }
+}
