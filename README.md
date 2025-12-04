@@ -56,6 +56,23 @@ Inspired by the legendary **IPMSG Protocol** but rebuilt from the ground up with
 
 ---
 
+## 📸 **Screenshots**
+
+<div align="center">
+  <img src="screenshots/main.png" alt="Main Interface" width="800"/>
+  <p><em>The main chat interface with glassmorphic design</em></p>
+  <br>
+  
+  <img src="screenshots/messages.png" alt="Messaging" width="800"/>
+  <p><em>Rich messaging with quotes and emojis</em></p>
+  <br>
+
+  <img src="screenshots/media.png" alt="Media Sharing" width="800"/>
+  <p><em>Seamless media and file sharing</em></p>
+</div>
+
+---
+
 ## ✨ **Features**
 
 ### 🌐 **Network & Communication**
