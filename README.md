@@ -276,7 +276,7 @@ Before you begin, ensure you have:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/roundtable.git
+git clone https://github.com/thefoultarnished/roundtable.git
 cd roundtable
 
 # 2. Install JavaScript dependencies
