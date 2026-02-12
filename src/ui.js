@@ -455,7 +455,7 @@ export function renderUserList() {
   userListEl.innerHTML = '';
   state.displayedUsers.forEach(user => {
     const userEl = document.createElement('div');
-    userEl.className = `user-item flex items-center p-2 m-1 rounded-xl cursor-pointer hover:bg-slate-200/40 dark:hover:bg-slate-700/40 transition-all duration-300 ${user.id === state.activeChatUserId ? 'bg-gradient-to-r from-slate-200/60 to-slate-300/60 dark:from-slate-700/60 dark:to-slate-600/60 shadow-md' : ''}`;
+    userEl.className = `user-item flex items-center p-2 m-1 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300 ${user.id === state.activeChatUserId ? 'bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 shadow-md border border-teal-500/20' : ''}`;
     userEl.dataset.userId = user.id;
 
     const statusClass = user.status === 'online' ? 'bg-green-500' : 'bg-slate-500';
@@ -473,11 +473,11 @@ export function renderUserList() {
     userEl.innerHTML = `
       <div class="relative mr-3 flex-shrink-0">
         ${avatarHtml}
-        <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full ${statusClass} border-2 border-white dark:border-slate-800 ${glowClass}"></span>
+        <span class="absolute bottom-0 right-0 block h-3 w-3 rounded-full ${statusClass} border-2 border-slate-50 dark:border-slate-900 ${glowClass}"></span>
       </div>
       <div class="flex-grow overflow-hidden min-w-0">
-        <p class="font-semibold text-slate-800 dark:text-white truncate">${user.name}</p>
-        <p class="text-sm text-slate-500 dark:text-slate-400 font-mono truncate">${user.ip}</p>
+        <p class="font-semibold text-slate-900 dark:text-slate-100 truncate">${user.name}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-400 font-mono truncate">${user.ip}</p>
       </div>
       ${unreadBadgeHtml}
     `;
@@ -572,13 +572,13 @@ export function renderChatWindow() {
     chatHeaderAvatarEl.innerHTML = user.name.charAt(0);
   }
 
-  const usernameDisplay = user.username ? `<span class="text-base font-normal text-slate-500 dark:text-slate-400 ml-2">(@${user.username})</span>` : '';
+  const usernameDisplay = user.username ? `<span class="text-base font-normal text-slate-600 dark:text-slate-400 ml-2">(@${user.username})</span>` : '';
   chatHeaderNameEl.innerHTML = `${user.name}${usernameDisplay}`;
 
-  const statusColor = user.status === 'online' ? 'text-green-400' : 'text-slate-400';
-  let statusLine = `<span class="${statusColor}">● ${user.status}</span> <span class="text-slate-500">&middot;</span> ${user.ip}`;
+  const statusColor = user.status === 'online' ? 'text-green-500 dark:text-green-400' : 'text-slate-600 dark:text-slate-400';
+  let statusLine = `<span class="${statusColor}">● ${user.status}</span> <span class="text-slate-500 dark:text-slate-500">&middot;</span> ${user.ip}`;
   if (user.hostname) {
-    statusLine += ` <span class="text-slate-500">&middot;</span> <span class="hidden md:inline">${user.hostname}</span>`;
+    statusLine += ` <span class="text-slate-500 dark:text-slate-500">&middot;</span> <span class="hidden md:inline">${user.hostname}</span>`;
   }
   chatHeaderStatusEl.innerHTML = statusLine;
 
@@ -592,7 +592,7 @@ export function renderChatWindow() {
   groupedMessages.forEach(group => {
     const dateHeader = document.createElement('div');
     dateHeader.className = 'flex justify-center my-4';
-    dateHeader.innerHTML = `<div class="bg-slate-200/70 dark:bg-slate-700/70 rounded-full px-4 py-1 text-xs text-slate-600 dark:text-slate-300 backdrop-blur-sm">${group.dateLabel}</div>`;
+    dateHeader.innerHTML = `<div class="bg-slate-100 dark:bg-slate-800 rounded-full px-4 py-1 text-xs text-slate-700 dark:text-slate-300 backdrop-blur-sm border border-slate-200 dark:border-slate-700">${group.dateLabel}</div>`;
     fragment.appendChild(dateHeader);
 
     group.messages.forEach(message => {
@@ -621,14 +621,14 @@ export function createMessageBubble(message) {
 
     switch (ft.status) {
       case 'offered':
-        statusHtml = `<p class="text-sm text-slate-500 dark:text-slate-400">${fileSizeMb} MB · <span class="text-teal-500 font-semibold">Offer Sent</span></p>`;
+        statusHtml = `<p class="text-sm text-slate-600 dark:text-slate-400">${fileSizeMb} MB · <span class="text-teal-600 dark:text-teal-500 font-semibold">Offer Sent</span></p>`;
         break;
       case 'incoming':
         const acceptBtnId = `accept-${ft.transferId}`;
         const rejectBtnId = `reject-${ft.transferId}`;
 
         statusHtml = `
-          <p class="text-sm text-slate-500 dark:text-slate-400 mb-2">${fileSizeMb} MB · Wants to send you a file.</p>
+          <p class="text-sm text-slate-600 dark:text-slate-400 mb-2">${fileSizeMb} MB · Wants to send you a file.</p>
           <div class="flex gap-2 mt-1">
             <button id="${rejectBtnId}" class="flex-1 bg-red-500/20 hover:bg-red-500/40 text-red-700 dark:text-red-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300">Decline</button>
             <button id="${acceptBtnId}" class="flex-1 bg-green-500/20 hover:bg-green-500/40 text-green-700 dark:text-green-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300">Accept</button>
@@ -647,47 +647,47 @@ export function createMessageBubble(message) {
         }, 100);
         break;
       case 'accepted':
-           statusHtml = `<p class="text-sm text-slate-500 dark:text-slate-400">${fileSizeMb} MB · <span class="text-green-500 font-semibold">Accepted, starting transfer...</span></p>`;
+           statusHtml = `<p class="text-sm text-slate-600 dark:text-slate-400">${fileSizeMb} MB · <span class="text-green-600 dark:text-green-500 font-semibold">Accepted, starting transfer...</span></p>`;
         break;
       case 'downloading':
         const progress = ft.progress || 0;
         statusHtml = `
-          <p class="text-sm text-slate-500 dark:text-slate-400">${fileSizeMb} MB</p>
-          <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2 dark:bg-gray-700">
-            <div class="bg-blue-600 h-2.5 rounded-full" style="width: ${progress}%"></div>
+          <p class="text-sm text-slate-600 dark:text-slate-400">${fileSizeMb} MB</p>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 mb-2">
+            <div class="bg-blue-500 dark:bg-blue-600 h-2.5 rounded-full" style="width: ${progress}%"></div>
           </div>
-          <p class="text-xs text-blue-500 font-semibold">Downloading... ${progress}%</p>
+          <p class="text-xs text-blue-600 dark:text-blue-500 font-semibold">Downloading... ${progress}%</p>
         `;
         break;
       case 'completed':
-        statusHtml = `<p class="text-sm text-slate-500 dark:text-slate-400">${fileSizeMb} MB · <span class="text-green-500 font-semibold">Download Complete</span></p>`;
+        statusHtml = `<p class="text-sm text-slate-600 dark:text-slate-400">${fileSizeMb} MB · <span class="text-green-600 dark:text-green-500 font-semibold">Download Complete</span></p>`;
         break;
       case 'failed':
-        statusHtml = `<p class="text-sm text-slate-500 dark:text-slate-400">${fileSizeMb} MB · <span class="text-red-500 font-semibold">Transfer Failed</span></p>`;
+        statusHtml = `<p class="text-sm text-slate-600 dark:text-slate-400">${fileSizeMb} MB · <span class="text-red-600 dark:text-red-500 font-semibold">Transfer Failed</span></p>`;
         break;
       case 'rejected':
-        statusHtml = `<p class="text-sm text-slate-500 dark:text-slate-400">${fileSizeMb} MB · <span class="text-red-500 font-semibold">Offer Rejected</span></p>`;
+        statusHtml = `<p class="text-sm text-slate-600 dark:text-slate-400">${fileSizeMb} MB · <span class="text-red-600 dark:text-red-500 font-semibold">Offer Rejected</span></p>`;
         break;
       default:
-        statusHtml = `<p class="text-sm text-slate-500 dark:text-slate-400">${fileSizeMb} MB</p>`;
+        statusHtml = `<p class="text-sm text-slate-600 dark:text-slate-400">${fileSizeMb} MB</p>`;
     }
 
     const fileBubbleHtml = `
-      <div class="flex items-center gap-3 p-3 bg-slate-200 dark:bg-slate-700 rounded-xl max-w-sm shadow-md ${animationClass}">
-        <div class="w-12 h-12 bg-slate-300 dark:bg-slate-600 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
+      <div class="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl max-w-sm shadow-md border border-slate-200 dark:border-slate-700 ${animationClass}">
+        <div class="w-12 h-12 bg-slate-100 dark:bg-slate-600 rounded-lg flex items-center justify-center text-2xl flex-shrink-0">
           ${utils.getFileIcon(ft.fileType || '')}
         </div>
         <div class="flex-1 min-w-0">
-          <p class="font-semibold text-slate-800 dark:text-white truncate">${ft.fileName}</p>
+          <p class="font-semibold text-slate-900 dark:text-slate-100 truncate">${ft.fileName}</p>
           ${statusHtml}
         </div>
       </div>`;
 
     bubbleWrapper.innerHTML = `
       <div class="flex items-end gap-2 max-w-[85%]">
-        ${isSentByMe ? `<div class="text-[0.7rem] text-slate-500 dark:text-slate-400 pb-1 flex-shrink-0">${message.time}</div>` : ''}
+        ${isSentByMe ? `<div class="text-[0.7rem] text-slate-600 dark:text-slate-400 pb-1 flex-shrink-0">${message.time}</div>` : ''}
         ${fileBubbleHtml}
-        ${!isSentByMe ? `<div class="text-[0.7rem] text-slate-500 dark:text-slate-400 pb-1 flex-shrink-0">${message.time}</div>` : ''}
+        ${!isSentByMe ? `<div class="text-[0.7rem] text-slate-600 dark:text-slate-400 pb-1 flex-shrink-0">${message.time}</div>` : ''}
       </div>`;
 
     return bubbleWrapper;
@@ -722,8 +722,8 @@ export function createMessageBubble(message) {
   }
 
   const messageColor = isSentByMe
-    ? 'bg-gradient-to-br from-teal-500 to-cyan-600 text-white'
-    : 'bg-slate-200/80 dark:bg-slate-700/80 text-slate-800 dark:text-white';
+    ? 'bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-teal-500/30'
+    : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700';
 
   let textHtml = '';
   if (message.text) {
@@ -732,7 +732,7 @@ export function createMessageBubble(message) {
     textHtml = `<p class="leading-normal break-words">${formattedText}</p>`;
   }
 
-  const timestampHtml = `<div class="text-[0.7rem] text-slate-500 dark:text-slate-400 pb-1 flex-shrink-0">${message.time}</div>`;
+  const timestampHtml = `<div class="text-[0.7rem] text-slate-600 dark:text-slate-400 pb-1 flex-shrink-0">${message.time}</div>`;
 
   bubbleContent.innerHTML = `
     ${!isSentByMe ? senderAvatarHtml : ''}
