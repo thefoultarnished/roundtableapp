@@ -104,7 +104,7 @@ html.aurora {
 
 /* Global Roundness Variable */
 :root {
-  --element-radius: 22px; /* Customizable roundness */
+  --element-radius: 50px; /* Customizable roundness */
 }
 
 .rounded-app {

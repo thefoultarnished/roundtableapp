@@ -213,7 +213,7 @@ function UserItem({ user, index, isActive, unreadCount, onClick }) {
       </div>
       <div className="flex-grow overflow-hidden min-w-0">
         <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{user.name}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">{user.ip}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{user.username || 'unknown'}</p>
       </div>
       {unreadCount > 0 && (
         <div className="unread-badge ml-auto px-2.5 py-0.5 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full shadow-lg shadow-red-500/20 min-w-[1.5rem] flex items-center justify-center">
