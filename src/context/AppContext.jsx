@@ -26,6 +26,28 @@ const initialState = {
         timestamp: Date.now() - 3240000,
         files: []
       }
+    ],
+    'placeholder-aether': [
+      { sender: 'placeholder-aether', text: 'Hey! Ready to test the new file transfer speeds?', time: '09:00 AM', timestamp: Date.now() - 3600000 * 5, files: [] },
+      { sender: 'me', text: 'Absolutely, let me know when you start the broadcast.', time: '09:02 AM', timestamp: Date.now() - 3600000 * 4.9, files: [] },
+      { sender: 'placeholder-aether', text: 'I just pushed the latest UI updates to the repo.', time: '09:05 AM', timestamp: Date.now() - 3600000 * 4.8, files: [] },
+      { sender: 'placeholder-aether', text: 'Did you see the new blur effect on the sidebar?', time: '09:06 AM', timestamp: Date.now() - 3600000 * 4.7, files: [] },
+      { sender: 'me', text: 'Yeah, it looks much cleaner now. The glassmorphism is really popping.', time: '09:10 AM', timestamp: Date.now() - 3600000 * 4.6, files: [] },
+      { sender: 'placeholder-aether', text: 'What about the performance on mobile?', time: '09:15 AM', timestamp: Date.now() - 3600000 * 4.5, files: [] },
+      { sender: 'me', text: 'Still a bit laggy on older iPhones. We need to optimize the backdrop-filters.', time: '09:18 AM', timestamp: Date.now() - 3600000 * 4.4, files: [] },
+      { sender: 'placeholder-aether', text: 'I can look into a fallback for lower-spec devices.', time: '09:20 AM', timestamp: Date.now() - 3600000 * 4.3, files: [] },
+      { sender: 'placeholder-aether', text: 'Check this code snippet for the optimization:', time: '09:21 AM', timestamp: Date.now() - 3600000 * 4.2, files: [] },
+      { sender: 'placeholder-aether', text: '```css\n.low-spec { backdrop-filter: none; background: rgba(0,0,0,0.8); }\n```', time: '09:21 AM', timestamp: Date.now() - 3600000 * 4.1, files: [] },
+      { sender: 'me', text: 'That should work as a safe fallback.', time: '09:25 AM', timestamp: Date.now() - 3600000 * 4.0, files: [] },
+      { sender: 'placeholder-aether', text: 'Sending the full documentation now.', time: '09:30 AM', timestamp: Date.now() - 3600000 * 3.9, files: [] },
+      { sender: 'placeholder-aether', text: 'Wait, I need to zip it first.', time: '09:31 AM', timestamp: Date.now() - 3600000 * 3.8, files: [] },
+      { sender: 'me', text: 'No rush.', time: '09:35 AM', timestamp: Date.now() - 3600000 * 3.7, files: [] },
+      { sender: 'placeholder-aether', text: 'Okay, here it is.', time: '09:40 AM', timestamp: Date.now() - 3600000 * 3.6, files: [] },
+      { sender: 'placeholder-aether', fileTransfer: { fileName: 'Architecture_v2.pdf', fileSize: 5242880, status: 'offered', transferId: 'tx-1' }, time: '09:41 AM', timestamp: Date.now() - 3600000 * 3.5 },
+      { sender: 'me', text: 'Got it. Reviewing it now.', time: '09:45 AM', timestamp: Date.now() - 3600000 * 3.4, files: [] },
+      { sender: 'placeholder-aether', text: 'Any thoughts on the new routing system?', time: '09:50 AM', timestamp: Date.now() - 3600000 * 3.3, files: [] },
+      { sender: 'me', text: 'It seems way more robust than the previous one.', time: '09:55 AM', timestamp: Date.now() - 3600000 * 3.2, files: [] },
+      { sender: 'placeholder-aether', text: 'Great. Let\'s sync up tomorrow for the deploy.', time: '10:00 AM', timestamp: Date.now() - 3600000 * 3.1, files: [] }
     ]
   },
   allUsers: [
@@ -37,7 +59,27 @@ const initialState = {
       port: 1421,
       status: 'online',
       avatarGradient: 'from-blue-500 to-indigo-600',
-      profile_picture: null
+      profile_picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      id: 'placeholder-aether',
+      name: 'Aether',
+      username: 'sky_walker',
+      ip: '192.168.1.42',
+      port: 1422,
+      status: 'online',
+      avatarGradient: 'from-emerald-400 to-teal-500',
+      profile_picture: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      id: 'placeholder-nova',
+      name: 'Nova',
+      username: 'cosmic_ray',
+      ip: '10.0.0.5',
+      port: 1423,
+      status: 'offline',
+      avatarGradient: 'from-purple-500 to-pink-500',
+      profile_picture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
     }
   ],
   displayedUsers: [
@@ -49,7 +91,27 @@ const initialState = {
       port: 1421,
       status: 'online',
       avatarGradient: 'from-blue-500 to-indigo-600',
-      profile_picture: null
+      profile_picture: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      id: 'placeholder-aether',
+      name: 'Aether',
+      username: 'sky_walker',
+      ip: '192.168.1.42',
+      port: 1422,
+      status: 'online',
+      avatarGradient: 'from-emerald-400 to-teal-500',
+      profile_picture: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      id: 'placeholder-nova',
+      name: 'Nova',
+      username: 'cosmic_ray',
+      ip: '10.0.0.5',
+      port: 1423,
+      status: 'offline',
+      avatarGradient: 'from-purple-500 to-pink-500',
+      profile_picture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
     }
   ],
   discoveredUsers: [],

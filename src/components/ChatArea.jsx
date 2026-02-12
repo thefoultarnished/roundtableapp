@@ -326,10 +326,6 @@ export default function ChatArea() {
                   {group.messages.map((msg, mi) => (
                     <div 
                       key={`${gi}-${mi}`}
-                      style={{
-                        animation: 'slideIn 0.3s ease-out',
-                        animationDelay: `${mi * 30}ms`
-                      }}
                     >
                       <MessageBubble message={msg} />
                     </div>
@@ -360,11 +356,15 @@ export default function ChatArea() {
               background: transparent;
             }
             div::-webkit-scrollbar-thumb {
-              background: rgba(71, 85, 105, 0.5);
-              border-radius: 3px;
+              background: var(--text-muted);
+              opacity: 0.5;
+              border-radius: 10px;
+              border: 2px solid transparent;
+              background-clip: content-box;
             }
             div::-webkit-scrollbar-thumb:hover {
-              background: rgba(71, 85, 105, 0.8);
+              background: var(--accent-1);
+              box-shadow: 0 0 10px var(--accent-glow);
             }
           `}</style>
         </div>
@@ -396,23 +396,25 @@ export default function ChatArea() {
         {/* Message input footer */}
         <footer className="p-5 flex-shrink-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent">
           <form onSubmit={handleSubmit}>
-            <div className={`relative rounded-app overflow-hidden transition-all duration-300 ${
+            <div className={`flex items-end rounded-app overflow-hidden transition-all duration-300 ${
               inputFocused 
                 ? 'ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-400/10 border-cyan-400/30' 
                 : 'border border-white/10 hover:border-white/20'
             } bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl`}>
               
-              {/* Attachment button */}
-              <button
-                type="button"
-                onClick={handleAttachment}
-                className="absolute left-4 bottom-3.5 p-2 text-slate-400 hover:text-cyan-400 transition-all duration-300 hover:scale-110 rounded-app hover:bg-cyan-400/10 active:scale-95"
-                title="Attach files"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                </svg>
-              </button>
+              {/* Attachment button wrapper */}
+              <div className="h-12 flex items-center justify-center pl-2 pb-1">
+                <button
+                  type="button"
+                  onClick={handleAttachment}
+                  className="p-2 text-slate-400 hover:text-cyan-400 transition-all duration-300 hover:scale-110 rounded-app hover:bg-cyan-400/10 active:scale-95 flex-shrink-0"
+                  title="Attach files"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                </button>
+              </div>
 
               {/* Textarea */}
               <textarea
@@ -424,29 +426,31 @@ export default function ChatArea() {
                 onKeyDown={handleKeyDown}
                 onFocus={() => setInputFocused(true)}
                 onBlur={() => setInputFocused(false)}
-                className="w-full bg-transparent focus:outline-none text-sm text-white py-3.5 pl-14 pr-14 resize-none overflow-y-auto min-h-[3rem] max-h-32 border-0 placeholder:text-slate-500/60"
+                className="flex-1 bg-transparent focus:outline-none text-sm text-white py-3.5 px-3 resize-none overflow-y-auto min-h-[3rem] max-h-32 border-0 placeholder:text-slate-500/60"
               />
 
-              {/* Send button */}
-              <button
-                type="submit"
-                disabled={!hasContent}
-                className={`absolute right-3.5 bottom-3.5 p-2.5 transition-all duration-300 rounded-app hover:bg-cyan-400/10 active:scale-95 ${
-                  hasContent 
-                    ? 'scale-100 opacity-100 cursor-pointer' 
-                    : 'opacity-30 scale-90 cursor-not-allowed'
-                }`}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24">
-                  <defs>
-                    <linearGradient id="send-icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#06b6d4" />
-                      <stop offset="100%" stopColor="#14b8a6" />
-                    </linearGradient>
-                  </defs>
-                  <path fill="url(#send-icon-gradient)" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                </svg>
-              </button>
+              {/* Send button wrapper */}
+              <div className="h-12 flex items-center justify-center pr-2 pb-1">
+                <button
+                  type="submit"
+                  disabled={!hasContent}
+                  className={`p-2 transition-all duration-300 rounded-app hover:bg-cyan-400/10 active:scale-95 flex-shrink-0 ${
+                    hasContent 
+                      ? 'scale-100 opacity-100 cursor-pointer' 
+                      : 'opacity-30 scale-90 cursor-not-allowed'
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24">
+                    <defs>
+                      <linearGradient id="send-icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#06b6d4" />
+                        <stop offset="100%" stopColor="#14b8a6" />
+                      </linearGradient>
+                    </defs>
+                    <path fill="url(#send-icon-gradient)" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </form>
         </footer>

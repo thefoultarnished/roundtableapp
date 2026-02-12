@@ -27,9 +27,9 @@ export default function MessageBubble({ message }) {
 
   const senderAvatar = !isSentByMe ? (
     senderUser?.profile_picture ? (
-      <img src={senderUser.profile_picture} className="w-9 h-9 rounded-full object-cover shadow-md ring-2 ring-white/20 flex-shrink-0" alt={senderUser.name} />
+      <img src={senderUser.profile_picture} className="w-12 h-12 rounded-full object-cover shadow-md ring-2 ring-white/20 flex-shrink-0" alt={senderUser.name} />
     ) : (
-      <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${senderUser?.avatarGradient || 'from-gray-500 to-gray-600'} flex items-center justify-center font-bold text-white text-sm flex-shrink-0 shadow-md ring-2 ring-white/20`}>
+      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${senderUser?.avatarGradient || 'from-gray-500 to-gray-600'} flex items-center justify-center font-bold text-white text-base flex-shrink-0 shadow-md ring-2 ring-white/20`}>
         {senderUser?.name?.charAt(0) || '?'}
       </div>
     )
@@ -37,9 +37,9 @@ export default function MessageBubble({ message }) {
 
   const myAvatar = isSentByMe ? (
     myProfilePicture ? (
-      <img src={myProfilePicture} className="w-9 h-9 rounded-full object-cover shadow-md ring-2 ring-white/20 flex-shrink-0" alt="Me" />
+      <img src={myProfilePicture} className="w-12 h-12 rounded-full object-cover shadow-md ring-2 ring-white/20 flex-shrink-0" alt="Me" />
     ) : (
-      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm flex-shrink-0 shadow-md ring-2 ring-white/20">U</div>
+      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-base flex-shrink-0 shadow-md ring-2 ring-white/20">U</div>
     )
   ) : null;
 
