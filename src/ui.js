@@ -422,6 +422,58 @@ export function initializeUI() {
     }, 1000);
   });
   
+  // Connection Mode Segmented Control Logic
+  const lanBtn = document.getElementById('set-lan-mode');
+  const onlineBtn = document.getElementById('set-online-mode');
+  const indicator = document.getElementById('conn-indicator');
+  const connDesc = document.getElementById('conn-description');
+  
+  function updateConnectionUI(mode) {
+    if (!lanBtn || !onlineBtn || !indicator || !connDesc) return;
+    
+    const isOnline = mode === 'online';
+    
+    if (isOnline) {
+      indicator.style.left = 'calc(50%)';
+      onlineBtn.classList.remove('text-slate-500', 'dark:text-slate-400');
+      onlineBtn.classList.add('text-purple-600', 'dark:text-purple-400');
+      lanBtn.classList.remove('text-teal-600', 'dark:text-teal-400');
+      lanBtn.classList.add('text-slate-500', 'dark:text-slate-400');
+      connDesc.textContent = 'Internet-wide connection via Relay';
+    } else {
+      indicator.style.left = '4px';
+      lanBtn.classList.remove('text-slate-500', 'dark:text-slate-400');
+      lanBtn.classList.add('text-teal-600', 'dark:text-teal-400');
+      onlineBtn.classList.remove('text-purple-600', 'dark:text-purple-400');
+      onlineBtn.classList.add('text-slate-500', 'dark:text-slate-400');
+      connDesc.textContent = 'Fast local discovery via network broadcast';
+    }
+  }
+
+  // Load saved state
+  const savedConnMode = localStorage.getItem('connectionMode') || 'lan';
+  updateConnectionUI(savedConnMode);
+
+  lanBtn?.addEventListener('click', () => {
+    localStorage.setItem('connectionMode', 'lan');
+    updateConnectionUI('lan');
+    showNotification('Switched to LAN Mode');
+    // Immediate application
+    if (state.globalInvokeFunc) {
+        state.globalInvokeFunc('broadcast_discovery_query');
+    }
+  });
+
+  onlineBtn?.addEventListener('click', () => {
+    localStorage.setItem('connectionMode', 'online');
+    updateConnectionUI('online');
+    showNotification('Switched to Online Mode');
+    // Immediate application
+    if (state.globalInvokeFunc) {
+        state.globalInvokeFunc('broadcast_discovery_query');
+    }
+  });
+  
 }
 
 // ... Additional helper functions like adjustTextareaHeight, createMessageBubble, etc.
