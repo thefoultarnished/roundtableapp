@@ -396,7 +396,7 @@ export default function ChatArea() {
         {/* Message input footer */}
         <footer className="p-5 flex-shrink-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent">
           <form onSubmit={handleSubmit}>
-            <div className={`relative rounded-2xl overflow-hidden transition-all duration-300 ${
+            <div className={`relative rounded-app overflow-hidden transition-all duration-300 ${
               inputFocused 
                 ? 'ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-400/10 border-cyan-400/30' 
                 : 'border border-white/10 hover:border-white/20'
@@ -406,7 +406,7 @@ export default function ChatArea() {
               <button
                 type="button"
                 onClick={handleAttachment}
-                className="absolute left-4 bottom-3.5 p-2 text-slate-400 hover:text-cyan-400 transition-all duration-300 hover:scale-110 rounded-lg hover:bg-cyan-400/10 active:scale-95"
+                className="absolute left-4 bottom-3.5 p-2 text-slate-400 hover:text-cyan-400 transition-all duration-300 hover:scale-110 rounded-app hover:bg-cyan-400/10 active:scale-95"
                 title="Attach files"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -431,7 +431,7 @@ export default function ChatArea() {
               <button
                 type="submit"
                 disabled={!hasContent}
-                className={`absolute right-3.5 bottom-3.5 p-2.5 transition-all duration-300 rounded-lg hover:bg-cyan-400/10 active:scale-95 ${
+                className={`absolute right-3.5 bottom-3.5 p-2.5 transition-all duration-300 rounded-app hover:bg-cyan-400/10 active:scale-95 ${
                   hasContent 
                     ? 'scale-100 opacity-100 cursor-pointer' 
                     : 'opacity-30 scale-90 cursor-not-allowed'

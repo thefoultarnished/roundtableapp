@@ -107,7 +107,7 @@ export default function Sidebar() {
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
-            className="w-full pl-10 pr-10 py-2 rounded-xl bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/10 focus:border-teal-500/50 outline-none transition-all duration-300 placeholder-slate-400/70 text-sm text-slate-800 dark:text-slate-200 backdrop-blur-sm"
+            className="w-full pl-10 pr-10 py-2 rounded-app bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/10 focus:border-teal-500/50 outline-none transition-all duration-300 placeholder-slate-400/70 text-sm text-slate-800 dark:text-slate-200 backdrop-blur-sm"
           />
           <button
             id="refresh-users"
@@ -149,7 +149,7 @@ export default function Sidebar() {
 
       {/* Profile footer — Glass card */}
       <div className="p-3 mt-auto border-t border-white/10 dark:border-white/5">
-        <div className="flex items-center gap-3 p-2 rounded-xl bg-white/20 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5 transition-all duration-300 hover:bg-white/30 dark:hover:bg-white/8 group">
+        <div className="flex items-center gap-3 p-2 rounded-app bg-white/20 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5 transition-all duration-300 hover:bg-white/30 dark:hover:bg-white/8 group">
           <div className="relative flex-shrink-0">
             {profilePicture ? (
               <img src={profilePicture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-teal-400/30 transition-all duration-300" alt="Profile" />
@@ -170,7 +170,7 @@ export default function Sidebar() {
           <button
             onClick={() => dispatch({ type: 'SET_SETTINGS_OPEN', payload: true })}
             title="Open Settings"
-            className="p-2 rounded-lg text-slate-400 hover:text-teal-400 hover:bg-teal-500/10 transition-all duration-300 hover:rotate-90"
+            className="p-2 rounded-app text-slate-400 hover:text-teal-400 hover:bg-teal-500/10 transition-all duration-300 hover:rotate-90"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -194,7 +194,7 @@ function UserItem({ user, index, isActive, unreadCount, onClick }) {
 
   return (
     <div
-      className={`user-item shimmer-hover flex items-center p-2.5 my-0.5 rounded-xl cursor-pointer transition-all duration-300 ${
+      className={`user-item shimmer-hover flex items-center p-2.5 my-0.5 rounded-app cursor-pointer transition-all duration-300 ${
         isActive
           ? 'bg-gradient-to-r from-teal-500/15 to-cyan-500/10 dark:from-teal-500/10 dark:to-cyan-500/5 shadow-lg shadow-teal-500/5 border-teal-500/30 backdrop-blur-sm'
           : 'hover:bg-white/20 dark:hover:bg-white/5'

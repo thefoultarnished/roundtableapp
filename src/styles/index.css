@@ -75,6 +75,16 @@
   --aurora-4: rgba(236, 72, 153, 0.04);
 }
 
+/* Global Roundness Variable */
+:root {
+  --element-radius: 20px; /* Customizable roundness */
+}
+
+.rounded-app {
+  border-radius: var(--element-radius) !important;
+}
+
+
 /* --- Base Reset & Typography --- */
 *, *::before, *::after {
   box-sizing: border-box;
