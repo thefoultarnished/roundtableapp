@@ -44,13 +44,10 @@ export default function SettingsModal() {
     document.documentElement.style.setProperty('--chat-font', chatFont);
     document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
 
-    const nameChanged = displayName !== oldDisplayName;
-    const usernameChanged = username !== oldUsername;
-
-    if (nameChanged || usernameChanged) {
+    if (displayName !== oldDisplayName || username !== oldUsername) {
       announcePresence();
       setTimeout(() => announcePresence(), 1000);
-      setSaveStatus('Name Updated! ✓');
+      setSaveStatus('Updated! ✓');
     } else {
       setSaveStatus('Saved! ✓');
     }
@@ -62,61 +59,65 @@ export default function SettingsModal() {
   };
 
   const handlePfpChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const f = e.target.files[0];
+    if (!f) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 96;
-        canvas.height = 96;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, 96, 96);
+        canvas.width = 96; canvas.height = 96;
+        canvas.getContext('2d').drawImage(img, 0, 0, 96, 96);
         const resized = canvas.toDataURL('image/png');
         setProfilePicture(resized);
         localStorage.setItem('profilePicture', resized);
         announcePresence();
       };
-      img.src = event.target.result;
+      img.src = ev.target.result;
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(f);
   };
 
   const close = () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: false });
 
+  const inputClass = "w-full px-3 py-2 text-xs rounded-xl bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/40 transition-all duration-300 text-slate-800 dark:text-slate-200 placeholder:text-slate-400/60 backdrop-blur-sm";
+  const selectClass = "w-full p-2 text-[11px] rounded-xl bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 outline-none text-slate-800 dark:text-slate-200 cursor-pointer backdrop-blur-sm focus:ring-2 focus:ring-teal-500/30";
+  const labelClass = "block text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1.5 ml-0.5";
+
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 modal-backdrop" onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className="bg-white/80 dark:bg-slate-800/90 backdrop-blur-xl rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col glassmorphism transform transition-all duration-300 border border-white/20">
+      <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="p-6 border-b border-slate-200/50 dark:border-slate-700/50 flex-shrink-0 flex justify-between items-center bg-white/50 dark:bg-slate-800/50 rounded-t-3xl">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <span className="text-2xl">⚙️</span>
+        <div className="p-5 border-b border-white/10 dark:border-white/5 flex justify-between items-center">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-3">
+            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-sm shadow-lg shadow-teal-500/20">⚙</span>
             <span>Settings</span>
           </h2>
-          <button onClick={close} className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-all duration-300 hover:rotate-90">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <button onClick={close} className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 hover:rotate-90">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Content */}
-        <div className="px-6 py-4 overflow-y-hidden grid grid-cols-1 md:grid-cols-3 gap-6 text-slate-600 dark:text-slate-300">
+        {/* Body */}
+        <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* Column 1: Profile */}
           <div className="space-y-4">
-            <h3 className="text-[11px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-widest border-b border-teal-500/20 pb-1.5">Profile</h3>
-            <div className="flex flex-col items-center p-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200/50 dark:border-slate-700/30">
-              <div className="relative group">
-                <img
-                  src={profilePicture || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>' }
-                  className="h-16 w-16 rounded-full bg-slate-200 dark:bg-slate-700 object-cover border-2 border-white dark:border-gray-800 shadow shadow-teal-500/10 transition-transform duration-300 group-hover:scale-105"
-                  alt="Profile"
-                />
+            <SectionHeader color="teal" label="Profile" />
+            <div className="flex flex-col items-center p-4 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+              <div className="relative group mb-3">
+                <div className="w-20 h-20 rounded-full overflow-hidden ring-3 ring-white/20 group-hover:ring-teal-400/40 transition-all duration-400 shadow-lg">
+                  <img
+                    src={profilePicture || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>'}
+                    className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 object-cover"
+                    alt="Profile"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => document.getElementById('pfp-file-input')?.click()}
-                  className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-teal-500 text-white shadow-lg border-2 border-white dark:border-slate-800 hover:bg-teal-600 transition-colors"
+                  className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white shadow-lg shadow-teal-500/30 border-2 border-white dark:border-slate-900 hover:scale-110 transition-transform duration-300"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -128,35 +129,23 @@ export default function SettingsModal() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 ml-1">Display Name</label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 outline-none focus:ring-1 focus:ring-teal-500 transition-all"
-                  placeholder="Name"
-                />
+                <label className={labelClass}>Display Name</label>
+                <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} placeholder="Name" />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 ml-1">Username (@)</label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 outline-none focus:ring-1 focus:ring-teal-500 transition-all"
-                  placeholder="Unique ID"
-                />
+                <label className={labelClass}>Username (@)</label>
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className={inputClass} placeholder="Unique ID" />
               </div>
             </div>
           </div>
 
           {/* Column 2: Appearance */}
           <div className="space-y-4">
-            <h3 className="text-[11px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest border-b border-purple-500/20 pb-1.5">Appearance</h3>
-            <div className="space-y-2.5 p-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200/50 dark:border-slate-700/30">
+            <SectionHeader color="purple" label="Appearance" />
+            <div className="space-y-3 p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">App Font</label>
-                <select value={appFont} onChange={(e) => setAppFont(e.target.value)} className="w-full p-2 text-[11px] rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 outline-none text-slate-800 dark:text-slate-200 cursor-pointer shadow-sm">
+                <label className={labelClass}>App Font</label>
+                <select value={appFont} onChange={(e) => setAppFont(e.target.value)} className={selectClass}>
                   <option value="'Inter', sans-serif">Inter (Clean)</option>
                   <option value="'Roboto', sans-serif">Roboto</option>
                   <option value="'Montserrat', sans-serif">Montserrat</option>
@@ -165,8 +154,8 @@ export default function SettingsModal() {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Chat Font</label>
-                <select value={chatFont} onChange={(e) => setChatFont(e.target.value)} className="w-full p-2 text-[11px] rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 outline-none text-slate-800 dark:text-slate-200 cursor-pointer shadow-sm">
+                <label className={labelClass}>Chat Font</label>
+                <select value={chatFont} onChange={(e) => setChatFont(e.target.value)} className={selectClass}>
                   <option value="'Inter', sans-serif">Inter (Clean)</option>
                   <option value="'Roboto Mono', monospace">Roboto Mono</option>
                   <option value="'Fira Code', monospace">Fira Code</option>
@@ -175,28 +164,29 @@ export default function SettingsModal() {
                 </select>
               </div>
             </div>
-            <div>
-              <div className="flex justify-between items-center mb-1 px-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Scale</label>
-                <span className="text-[10px] font-bold font-mono text-purple-600 bg-purple-100 dark:bg-purple-900/40 px-1.5 rounded">{fontScale}%</span>
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+              <div className="flex justify-between items-center mb-2">
+                <label className={labelClass + ' mb-0'}>Scale</label>
+                <span className="text-[10px] font-bold font-mono text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">{fontScale}%</span>
               </div>
-              <input type="range" min="50" max="200" step="10" value={fontScale} onChange={(e) => setFontScale(e.target.value)} className="w-full h-1.5 rounded-lg appearance-none bg-slate-200 dark:bg-slate-700 accent-purple-500 cursor-pointer" />
+              <input type="range" min="50" max="200" step="10" value={fontScale} onChange={(e) => setFontScale(e.target.value)}
+                className="w-full h-1.5 rounded-lg appearance-none bg-white/20 dark:bg-white/10 accent-purple-500 cursor-pointer" />
             </div>
           </div>
 
           {/* Column 3: Network */}
           <div className="space-y-4">
-            <h3 className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest border-b border-blue-500/20 pb-1.5">Network</h3>
-            <div className="bg-slate-50/50 dark:bg-slate-900/30 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-700/30">
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 ml-1">Connection Mode</label>
+            <SectionHeader color="blue" label="Network" />
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+              <label className={labelClass}>Connection Mode</label>
               <ConnectionModeToggle />
             </div>
-            <div className="p-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-200/50 dark:border-slate-700/30">
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Auto-Download</span>
+                <span className={labelClass + ' mb-0'}>Auto-Download</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} className="sr-only peer" />
-                  <div className="w-8 h-4 bg-slate-300 dark:bg-slate-600 rounded-full peer peer-checked:bg-teal-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4 shadow-inner" />
+                  <div className="w-9 h-5 bg-white/20 dark:bg-white/10 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-teal-400 peer-checked:to-cyan-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 after:shadow-lg" />
                 </label>
               </div>
             </div>
@@ -204,11 +194,11 @@ export default function SettingsModal() {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200/50 dark:border-slate-700/50 flex flex-shrink-0 justify-end gap-3 bg-slate-50/50 dark:bg-slate-800/30 rounded-b-3xl">
-          <button onClick={close} className="px-4 py-2 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all">Cancel</button>
+        <div className="px-5 py-4 border-t border-white/10 dark:border-white/5 flex justify-end gap-3">
+          <button onClick={close} className="px-5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:bg-white/10 transition-all duration-300">Cancel</button>
           <button
             onClick={handleSave}
-            className="px-8 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-teal-500 to-blue-500 hover:from-teal-600 hover:to-blue-600 shadow-md hover:shadow-teal-500/20 transform hover:-translate-y-0.5 active:translate-y-0 transition-all"
+            className="px-8 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/40 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
           >
             {saveStatus || 'Save Changes'}
           </button>
@@ -218,38 +208,41 @@ export default function SettingsModal() {
   );
 }
 
-function ConnectionModeToggle() {
-  const [mode, setMode] = useState(localStorage.getItem('connectionMode') || 'lan');
-
-  const handleSwitch = (newMode) => {
-    setMode(newMode);
-    localStorage.setItem('connectionMode', newMode);
+function SectionHeader({ color, label }) {
+  const colorMap = {
+    teal: 'text-teal-500 border-teal-500/20',
+    purple: 'text-purple-500 border-purple-500/20',
+    blue: 'text-blue-500 border-blue-500/20',
   };
 
   return (
+    <h3 className={`text-[10px] font-bold uppercase tracking-[0.2em] border-b pb-2 ${colorMap[color] || colorMap.teal}`}>
+      {label}
+    </h3>
+  );
+}
+
+function ConnectionModeToggle() {
+  const [mode, setMode] = useState(localStorage.getItem('connectionMode') || 'lan');
+
+  return (
     <>
-      <div className="relative bg-white dark:bg-slate-800 p-0.5 rounded-lg flex border border-slate-200 dark:border-slate-700/50 h-8">
+      <div className="relative bg-white/10 dark:bg-white/5 p-0.5 rounded-xl flex border border-white/15 dark:border-white/5 h-9 overflow-hidden">
         <div
-          className="absolute top-0.5 left-0.5 bottom-0.5 w-[calc(50%-2px)] bg-slate-100 dark:bg-slate-700 rounded-md shadow transition-all duration-300 z-0"
+          className="absolute top-0.5 bottom-0.5 w-[calc(50%-4px)] bg-gradient-to-r from-teal-500/20 to-cyan-500/20 dark:from-teal-500/15 dark:to-cyan-500/15 rounded-lg shadow-sm transition-all duration-400 z-0 backdrop-blur-sm border border-white/10"
           style={{ left: mode === 'online' ? 'calc(50%)' : '4px' }}
         />
-        <button
-          type="button"
-          onClick={() => handleSwitch('lan')}
-          className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none ${mode === 'lan' ? 'text-teal-600 dark:text-teal-400' : 'text-slate-500 dark:text-slate-400'}`}
-        >
+        <button type="button" onClick={() => { setMode('lan'); localStorage.setItem('connectionMode', 'lan'); }}
+          className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'lan' ? 'text-teal-500' : 'text-slate-400'}`}>
           LAN
         </button>
-        <button
-          type="button"
-          onClick={() => handleSwitch('online')}
-          className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none ${mode === 'online' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-500 dark:text-slate-400'}`}
-        >
+        <button type="button" onClick={() => { setMode('online'); localStorage.setItem('connectionMode', 'online'); }}
+          className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'online' ? 'text-purple-500' : 'text-slate-400'}`}>
           ONLINE
         </button>
       </div>
-      <p className="mt-2 text-[8.5px] text-center text-slate-400 uppercase tracking-tight opacity-70">
-        {mode === 'online' ? 'Internet-wide connection via Relay' : 'Fast local discovery via network broadcast'}
+      <p className="mt-2 text-[8px] text-center text-slate-400/60 uppercase tracking-wider">
+        {mode === 'online' ? 'Internet-wide via Relay' : 'Local network broadcast'}
       </p>
     </>
   );
