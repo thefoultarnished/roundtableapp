@@ -86,17 +86,24 @@ html.dark {
 }
 
 html.aurora {
-  --glass-bg: rgba(20, 30, 40, var(--glass-opacity));
-  --glass-bg-heavy: rgba(10, 20, 30, calc(var(--glass-opacity) + 0.15));
-  --glass-border: rgba(56, 189, 248, 0.2); 
-  --glass-highlight: rgba(56, 189, 248, 0.1);
+  /* Aurora — Vibrant Deep Glass */
+  --glass-opacity: 0.25; /* Central transparency controller for all UI */
+  --glass-bg: rgba(15, 23, 42, var(--glass-opacity));
+  --glass-bg-heavy: rgba(15, 23, 42, calc(var(--glass-opacity) + 0.15));
+  --glass-bg-light: rgba(15, 23, 42, calc(var(--glass-opacity) - 0.1));
+  --glass-border: rgba(56, 189, 248, calc(var(--glass-opacity) + 0.05)); 
+  --glass-highlight: rgba(56, 189, 248, calc(var(--glass-opacity) - 0.1));
+  
   --text-primary: #f0f9ff;
   --text-secondary: #bae6fd;
+  --text-muted: #7dd3fc;
+  
+  --accent-glow: rgba(56, 189, 248, 0.4);
 }
 
 /* Global Roundness Variable */
 :root {
-  --element-radius: 20px; /* Customizable roundness */
+  --element-radius: 22px; /* Customizable roundness */
 }
 
 .rounded-app {
@@ -124,11 +131,10 @@ html, body {
 }
 
 #root {
-  border-radius: 0; /* Rectangular window */
+  border-radius: 0;
   overflow: hidden;
   width: 100%;
   height: 100%;
-  background: inherit;
   transition: background 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -200,39 +206,40 @@ html, body {
    ANIMATED AURORA BACKGROUND
    ========================================== */
 
+/* ==========================================
+   ANIMATED AURORA BACKGROUND
+   ========================================== */
+
+/* ==========================================
+   ANIMATED AURORA BACKGROUND
+   ========================================== */
+
 .aurora-bg {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
   overflow: hidden;
   pointer-events: none;
+  background-color: #050b18;
+  display: none;
 }
 
-.aurora-bg::before,
-.aurora-bg::after {
+html.aurora .aurora-bg {
+  display: block;
+}
+
+/* Premium Grain Texture */
+.aurora-bg::before {
   content: '';
   position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  animation: auroraFloat 20s ease-in-out infinite alternate;
-}
-
-.aurora-bg::before {
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, var(--aurora-1) 0%, transparent 70%);
-  top: -200px;
-  left: -100px;
-  animation-delay: 0s;
-}
-
-.aurora-bg::after {
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, var(--aurora-3) 0%, transparent 70%);
-  bottom: -150px;
-  right: -100px;
-  animation-delay: -7s;
+  inset: -100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.6' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.08;
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: overlay;
 }
 
 .aurora-orb-1,
@@ -242,40 +249,48 @@ html, body {
   border-radius: 50%;
   filter: blur(100px);
   pointer-events: none;
+  mix-blend-mode: screen; /* Glow effect */
+  opacity: 1; /* Full opacity for the element */
 }
 
 .aurora-orb-1 {
-  width: 400px;
-  height: 400px;
-  background: radial-gradient(circle, var(--aurora-2) 0%, transparent 70%);
-  top: 30%;
-  right: 10%;
-  animation: auroraFloat 25s ease-in-out infinite alternate-reverse;
+  width: 100vw;
+  height: 100vh;
+  /* Increased alpha from 0.2 to 0.8 for high visibility */
+  background: radial-gradient(circle at center, rgba(34, 211, 238, 0.8) 0%, transparent 70%);
+  top: -30%;
+  left: -20%;
+  animation: meshMove 20s ease-in-out infinite alternate;
 }
 
 .aurora-orb-2 {
-  width: 350px;
-  height: 350px;
-  background: radial-gradient(circle, var(--aurora-4) 0%, transparent 70%);
-  bottom: 20%;
-  left: 20%;
-  animation: auroraFloat2 18s ease-in-out infinite alternate;
+  width: 120vw;
+  height: 120vh;
+  /* Increased alpha from 0.15 to 0.7 */
+  background: radial-gradient(circle at center, rgba(139, 92, 246, 0.7) 0%, transparent 70%);
+  bottom: -40%;
+  right: -20%;
+  animation: meshMove 25s ease-in-out infinite alternate-reverse;
 }
 
 .aurora-orb-3 {
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, var(--aurora-1) 0%, transparent 70%);
-  top: 60%;
-  left: 50%;
-  animation: auroraFloat 22s ease-in-out infinite alternate;
-  animation-delay: -10s;
+  width: 90vw;
+  height: 90vh;
+  /* Increased alpha from 0.18 to 0.75 */
+  background: radial-gradient(circle at center, rgba(20, 184, 166, 0.75) 0%, transparent 70%);
+  top: 20%;
+  left: 20%;
+  animation: meshMove 22s ease-in-out infinite alternate;
+}
+
+@keyframes meshMove {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate(5%, 10%) scale(1.1) rotate(5deg); }
+  100% { transform: translate(-5%, -5%) scale(0.9) rotate(-5deg); }
 }
 
 @keyframes auroraFloat {
   0% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(60px, -40px) scale(1.1); }
-  66% { transform: translate(-30px, 30px) scale(0.95); }
   100% { transform: translate(40px, -20px) scale(1.05); }
 }
 

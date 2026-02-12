@@ -22,32 +22,51 @@ function AuroraBackground() {
 
 function AppContent() {
   const { state } = useAppContext();
+  const [saveStatus, setSaveStatus] = React.useState('');
   useTauriIntegration();
   useTheme();
   
-  React.useEffect(() => {
+  const updateBackground = () => {
+    const savedTheme = localStorage.getItem('theme') || 'light';
     const isTransparent = localStorage.getItem('windowTransparency') !== 'false';
-    if (isTransparent) {
-       // Semi-transparent base
-       const level = parseFloat(localStorage.getItem('transparencyLevel') || '0.75');
-       const winOpacity = parseFloat(localStorage.getItem('windowOpacity') || '0.70');
-       
-       document.documentElement.style.setProperty('--glass-opacity', level); 
-       
-       const savedTheme = localStorage.getItem('theme') || 'light';
-       document.documentElement.classList.remove('dark', 'aurora');
-       if (savedTheme === 'dark') document.documentElement.classList.add('dark');
-       if (savedTheme === 'aurora') document.documentElement.classList.add('aurora');
+    const winOpacity = parseFloat(localStorage.getItem('windowOpacity') || '0.70');
+    
+    // 1. Sync Theme Classes
+    document.documentElement.classList.remove('dark', 'aurora');
+    if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+    if (savedTheme === 'aurora') document.documentElement.classList.add('aurora');
 
-       const isDark = savedTheme === 'dark' || savedTheme === 'aurora';
-       document.getElementById('root').style.background = isDark 
-          ? `rgba(2, 6, 23, ${winOpacity})` 
-          : `rgba(235, 238, 244, ${winOpacity})`;
+    // 2. Set Root Background
+    const root = document.getElementById('root');
+    if (!root) return;
+
+    if (savedTheme === 'aurora') {
+      // Aurora MUST be transparent to show the animated layers behind it
+      root.style.background = 'transparent';
+      document.documentElement.style.background = 'transparent'; // Force html transparent
+      document.body.style.background = 'transparent'; // Force body transparent
+    } else if (isTransparent) {
+      const isDark = savedTheme === 'dark';
+      root.style.background = isDark 
+        ? `rgba(2, 6, 23, ${winOpacity})` 
+        : `rgba(235, 238, 244, ${winOpacity})`;
     } else {
-       const isDark = document.documentElement.classList.contains('dark');
-       document.getElementById('root').style.background = isDark ? '#020617' : '#e2e8f0';
+      const isDark = savedTheme === 'dark';
+      root.style.background = isDark ? '#020617' : '#e2e8f0';
     }
+  };
+
+  React.useEffect(() => {
+    updateBackground();
+    // Listen for storage changes (settings updates)
+    window.addEventListener('storage', updateBackground);
+    return () => window.removeEventListener('storage', updateBackground);
   }, []);
+
+  // Update when settings modal closes or theme state changes
+  React.useEffect(() => {
+    updateBackground();
+  }, [state.settingsOpen]);
 
   return (
     <div className="h-screen flex flex-row overflow-hidden relative">
