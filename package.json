@@ -6,15 +6,21 @@
   "scripts": {
     "dev": "npx @tauri-apps/cli dev",
     "build": "npx @tauri-apps/cli build",
-    "tauri": "npx @tauri-apps/cli"
+    "tauri": "npx @tauri-apps/cli",
+    "vite:dev": "vite",
+    "vite:build": "vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
+    "@vitejs/plugin-react": "^5.1.4",
     "vite": "^7.0.4"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.6.0",
     "@tauri-apps/plugin-notification": "^2.3.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "ws": "^8.19.0"
   }
 }

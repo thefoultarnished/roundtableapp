@@ -4,7 +4,10 @@
   "productName": "Roundtable",
   "version": "0.1.0",
   "build": {
-    "frontendDist": "../src"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run vite:dev",
+    "beforeBuildCommand": "npm run vite:build"
   },
   "app": {
     "withGlobalTauri": true,
