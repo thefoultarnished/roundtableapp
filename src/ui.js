@@ -6,7 +6,9 @@ import {
     logChatParticipants, 
     initiateFileDownload,
     logSessionStart,
-    downloadFile
+    downloadFile,
+    connectToRelay,
+    disconnectRelay
 } from './network.js';
 
 // Re-export needed functions if necessary, or just keep them here.
@@ -462,6 +464,7 @@ export function initializeUI() {
     if (state.globalInvokeFunc) {
         state.globalInvokeFunc('broadcast_discovery_query');
     }
+    disconnectRelay();
   });
 
   onlineBtn?.addEventListener('click', () => {
@@ -469,9 +472,7 @@ export function initializeUI() {
     updateConnectionUI('online');
     showNotification('Switched to Online Mode');
     // Immediate application
-    if (state.globalInvokeFunc) {
-        state.globalInvokeFunc('broadcast_discovery_query');
-    }
+    connectToRelay();
   });
   
 }

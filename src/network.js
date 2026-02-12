@@ -11,6 +11,7 @@ import {
     updateSendButton,
     handleUserClick
 } from './ui.js';
+import * as crypto from './crypto.js';
 
 export function setupTauriIntegration() {
     if (window.__TAURI__ && window.__TAURI__.invoke) {
@@ -149,10 +150,194 @@ export function setupTauriIntegration() {
         console.error('Error setting up Tauri integration:', error);
     }
     
+
+    
+    // Check initial connection mode
+    if (localStorage.getItem('connectionMode') === 'online') {
+        connectToRelay();
+    }
+    
+    // Always start the discovery loop; it checks the mode internally
     setupPeriodicDiscovery();
 }
 
-export function sendMessageToBackend(message, targetIp, targetPort) {
+export async function connectToRelay() {
+    if (state.wsConnection && state.wsConnection.readyState === WebSocket.OPEN) return;
+
+    // Use user-configured URL or default
+    const relayUrl = localStorage.getItem('relayUrl') || state.relayUrl; 
+    console.log(`Connecting to Relay: ${relayUrl}`);
+
+    try {
+        state.wsConnection = new WebSocket(relayUrl);
+    } catch (e) {
+        console.error("Failed to create WebSocket:", e);
+        return;
+    }
+
+    state.wsConnection.onopen = async () => {
+        console.log('Connected to Relay Server');
+        showNotification('Online: Connected to Relay Server');
+        
+        // Generate keys if not present
+        if (!state.keyPair) {
+            state.keyPair = await crypto.generateKeyPair();
+        }
+        
+        const publicKeyJwk = await crypto.exportPublicKey(state.keyPair.publicKey);
+        const myUserId = utils.getSafeUserId();
+        const myDisplayName = localStorage.getItem('displayName') || 'Roundtable User';
+        const myUsername = localStorage.getItem('username') || 'Anonymous';
+        
+        // Identify ourselves
+        state.wsConnection.send(JSON.stringify({
+            type: 'identify',
+            userId: myUserId,
+            publicKey: publicKeyJwk,
+            info: {
+                name: myDisplayName,
+                username: myUsername,
+                ip: 'Relayed', 
+                port: 0 // Not relevant for relay
+            }
+        }));
+    };
+
+    state.wsConnection.onmessage = async (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            handleRelayMessage(data);
+        } catch (e) {
+            console.error('Error parsing relay message:', e);
+        }
+    };
+
+    state.wsConnection.onclose = () => {
+        console.log('Relay connection closed');
+        showNotification('Online: Disconnected from Relay');
+        state.wsConnection = null;
+        
+        // Auto-reconnect if still in online mode
+        if (localStorage.getItem('connectionMode') === 'online') {
+            setTimeout(connectToRelay, 5000);
+        }
+    };
+    
+    state.wsConnection.onerror = (err) => {
+        console.error('Relay connection error:', err);
+    };
+}
+
+export function disconnectRelay() {
+    if (state.wsConnection) {
+        state.wsConnection.close();
+        state.wsConnection = null;
+    }
+}
+
+async function handleRelayMessage(data) {
+    switch (data.type) {
+        case 'user_list':
+            updateOnlineUsers(data.users);
+            break;
+        case 'message':
+            await decryptAndDisplayMessage(data);
+            break;
+        case 'error':
+            console.error('Relay Error:', data.message);
+            showNotification(`Error: ${data.message}`, true);
+            break;
+    }
+}
+
+function updateOnlineUsers(users) {
+    if (!users) return;
+    
+    const myUserId = utils.getSafeUserId();
+    
+    // Clear LAN users if we want strict separation, or merge them. 
+    // For now, let's merge or replace based on strategy.
+    // If strict Online mode, maybe replace?
+    // Let's replace to avoid ghost users from LAN showing up as "online" in "Online Mode"
+    // state.allUsers = []; 
+
+    users.forEach(async u => {
+        if (u.id == myUserId) return;
+        
+        // Store public key
+        if (u.publicKey) {
+            const importedKey = await crypto.importPublicKey(u.publicKey);
+            state.remotePublicKeys[u.id] = importedKey;
+        }
+
+        const userObj = {
+            id: u.id,
+            name: u.info.name || 'Unknown',
+            username: u.info.username || 'Anonymous',
+            ip: 'Relay', 
+            port: 0,
+            status: 'online',
+            avatarGradient: 'from-blue-500 to-indigo-600', // Distinct color for online users?
+            isRemote: true
+        };
+        
+        addDiscoveredUser(userObj);
+    });
+}
+
+async function decryptAndDisplayMessage(data) {
+    const { senderId, payload } = data;
+    const { encryptedContent, iv } = payload;
+    
+    // Find sender
+    let sender = state.allUsers.find(u => u.id == senderId);
+    if (!sender) {
+        // Should have been added by user_list, but if not:
+        sender = { id: senderId, name: 'Unknown User', status: 'online' };
+        addDiscoveredUser(sender);
+    }
+
+    // Get shared key
+    const senderPublicKey = state.remotePublicKeys[senderId];
+    if (!senderPublicKey) {
+        console.error("No public key for sender:", senderId);
+        return;
+    }
+
+    // Derive shared secret
+    // Note: We need OUR private key
+    if (!state.keyPair) {
+        console.error("My keypair missing!");
+        return;
+    }
+
+    const sharedKey = await crypto.deriveSharedKey(state.keyPair.privateKey, senderPublicKey);
+    const content = await crypto.decryptMessage({ ciphertext: encryptedContent, iv }, sharedKey);
+
+    if (content) {
+        const messageData = {
+            sender_id: senderId,
+            sender: sender.name,
+            content: content,
+            timestamp: Date.now() / 1000 // approx
+        };
+        await displayReceivedMessage(messageData);
+    } else {
+        console.error("Failed to decrypt message from", senderId);
+    }
+}
+
+
+
+
+export async function sendMessageToBackend(message, targetIp, targetPort) {
+    const mode = localStorage.getItem('connectionMode');
+    
+    if (mode === 'online') {
+        return sendOnlineMessage(message);
+    }
+
+    // LAN Mode
     console.log(`SENDING MESSAGE to ${targetIp} (port ${targetPort}): "${message}"`);
 
     let invokeFunc = state.globalInvokeFunc;
@@ -209,6 +394,54 @@ export function sendMessageToBackend(message, targetIp, targetPort) {
     } catch (e) {
         console.error('Exception when calling invoke:', e);
     }
+}
+
+async function sendOnlineMessage(text) {
+    if (!state.wsConnection || state.wsConnection.readyState !== WebSocket.OPEN) {
+        showNotification("Not connected to Relay Server", true);
+        return;
+    }
+
+    const targetUserId = state.activeChatUserId;
+    if (!targetUserId) return;
+
+    const targetPublicKey = state.remotePublicKeys[targetUserId];
+    if (!targetPublicKey) {
+        showNotification("Security Error: User's public key not found.", true);
+        return;
+    }
+
+    if (!state.keyPair) {
+        state.keyPair = await crypto.generateKeyPair();
+    }
+
+    // E2EE: Encrypt
+    const sharedKey = await crypto.deriveSharedKey(state.keyPair.privateKey, targetPublicKey);
+    const encryptedData = await crypto.encryptMessage(text, sharedKey);
+
+    const payload = {
+        type: 'message',
+        targetId: targetUserId,
+        payload: {
+            encryptedContent: encryptedData.ciphertext,
+            iv: encryptedData.iv
+        }
+    };
+
+    state.wsConnection.send(JSON.stringify(payload));
+    
+    // Log it locally
+    const myDisplayName = localStorage.getItem('displayName') || 'Me';
+    const targetUser = state.allUsers.find(u => u.id === targetUserId);
+
+    logMessage(
+        myDisplayName,
+        "Relay",
+        targetUser?.name || "Unknown",
+        "Relay",
+        text,
+        true
+    );
 }
 
 export function addDiscoveredUser(user) {
@@ -406,14 +639,29 @@ export function announcePresence() {
     } catch (e) {
         console.error('Exception in announcePresence:', e);
     }
+
+    // Also broadcast on Relay if connected
+    if (state.wsConnection && state.wsConnection.readyState === WebSocket.OPEN) {
+        // Just send an presence update if needed, currently establish identity on connect
+        // Maybe update name if changed
+    }
 }
 
 export function setupPeriodicDiscovery() {
-    announcePresence();
+    // Clear existing interval to avoid duplicates
+    if (window.__DISCOVERY_INTERVAL) clearInterval(window.__DISCOVERY_INTERVAL);
+
+    // Initial announce if appropriate
+    if (localStorage.getItem('connectionMode') !== 'online') {
+        announcePresence();
+    }
 
     const discoveryInterval = setInterval(() => {
-        console.log("Auto-discovery: Broadcasting presence...");
-        announcePresence();
+        // Check mode dynamically
+        if (localStorage.getItem('connectionMode') !== 'online') {
+            console.log("Auto-discovery: Broadcasting presence...");
+            announcePresence();
+        }
     }, 15000);
 
     window.__DISCOVERY_INTERVAL = discoveryInterval;
