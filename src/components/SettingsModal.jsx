@@ -157,7 +157,7 @@ export default function SettingsModal() {
           {/* Column 1: Profile */}
           <div className="space-y-4">
             <SectionHeader color="teal" label="Profile" />
-            <div className="flex flex-col items-center p-4 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="flex flex-col items-center p-4 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="relative group mb-3">
                 <div className="w-20 h-20 rounded-full overflow-hidden ring-3 ring-white/20 group-hover:ring-teal-400/40 transition-all duration-400 shadow-lg">
                   <img
@@ -194,7 +194,7 @@ export default function SettingsModal() {
           {/* Column 2: Appearance */}
           <div className="space-y-4">
             <SectionHeader color="purple" label="Appearance" />
-            <div className="space-y-3 p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="space-y-3 p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div>
                 <label className={labelClass}>Theme</label>
                 <GlassDropdown
@@ -236,7 +236,7 @@ export default function SettingsModal() {
                 />
               </div>
             </div>
-            <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="flex justify-between items-center mb-2">
                 <label className={labelClass + ' mb-0'}>Scale</label>
                 <span className="text-[10px] font-bold font-mono text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">{fontScale}%</span>
@@ -247,7 +247,7 @@ export default function SettingsModal() {
             
             {/* Window Transparency Toggle */}
             {/* Window Transparency Toggle */}
-             <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
+             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className={labelClass + ' mb-0'}>Transparency</span>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -305,11 +305,11 @@ export default function SettingsModal() {
           {/* Column 3: Network */}
           <div className="space-y-4">
             <SectionHeader color="blue" label="Network" />
-            <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <label className={labelClass}>Connection Mode</label>
               <ConnectionModeToggle />
             </div>
-            <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="flex items-center justify-between">
                 <span className={labelClass + ' mb-0'}>Auto-Download</span>
                 <label className="relative inline-flex items-center cursor-pointer">

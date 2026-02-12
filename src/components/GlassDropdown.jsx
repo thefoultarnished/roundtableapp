@@ -64,7 +64,7 @@ export default function GlassDropdown({ value, options, onChange, className = ''
       <button
         type="button"
         onClick={toggleOpen}
-        className="w-full px-3 py-2 text-[11px] rounded-app bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 text-slate-800 dark:text-slate-200 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:bg-white/40 dark:hover:bg-white/10 hover:border-white/30 dark:hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/40 flex items-center justify-between"
+        className="w-full px-3 py-2 text-[11px] rounded-2xl bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 text-slate-800 dark:text-slate-200 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:bg-white/40 dark:hover:bg-white/10 hover:border-white/30 dark:hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/40 flex items-center justify-between"
         style={value.includes("'") ? { fontFamily: value } : {}}
       >
         <span>{selectedLabel}</span>
@@ -89,7 +89,7 @@ export default function GlassDropdown({ value, options, onChange, className = ''
             width: `${position.width}px`,
             visibility: position.top === -9999 ? 'hidden' : 'visible'
           }}
-          className="z-[99999] rounded-app backdrop-blur-xl border border-white/30 dark:border-white/10 shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          className="z-[99999] rounded-2xl backdrop-blur-xl border border-white/30 dark:border-white/10 shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
         >
           <div className="bg-white/40 dark:bg-slate-800/40">
             {options.map((option) => (
