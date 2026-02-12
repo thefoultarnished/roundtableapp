@@ -3,13 +3,61 @@ import React, { createContext, useContext, useReducer, useCallback, useRef } fro
 const AppContext = createContext(null);
 
 const initialState = {
-  messages: {},
-  allUsers: [],
-  displayedUsers: [],
+  messages: {
+    'placeholder-antigravity': [
+      {
+        sender: 'placeholder-antigravity',
+        text: 'Hello! I am Antigravity. I have been added so you can test the new glassmorphic UI and features.',
+        time: '10:00 AM',
+        timestamp: Date.now() - 3600000,
+        files: []
+      },
+      {
+        sender: 'me',
+        text: 'This looks amazing! The blur and transparency are perfect.',
+        time: '10:05 AM',
+        timestamp: Date.now() - 3300000,
+        files: []
+      },
+      {
+        sender: 'placeholder-antigravity',
+        text: 'Exactly! You can also test the settings modal and the dark mode switch.',
+        time: '10:06 AM',
+        timestamp: Date.now() - 3240000,
+        files: []
+      }
+    ]
+  },
+  allUsers: [
+    {
+      id: 'placeholder-antigravity',
+      name: 'Antigravity',
+      username: 'deepmind_ai',
+      ip: '127.0.0.1',
+      port: 1421,
+      status: 'online',
+      avatarGradient: 'from-blue-500 to-indigo-600',
+      profile_picture: null
+    }
+  ],
+  displayedUsers: [
+    {
+      id: 'placeholder-antigravity',
+      name: 'Antigravity',
+      username: 'deepmind_ai',
+      ip: '127.0.0.1',
+      port: 1421,
+      status: 'online',
+      avatarGradient: 'from-blue-500 to-indigo-600',
+      profile_picture: null
+    }
+  ],
   discoveredUsers: [],
   activeChatUserId: null,
   selectedFiles: [],
-  unreadCounts: {},
+  unreadCounts: {
+    'placeholder-antigravity': 1
+  },
   globalInvokeFunc: null,
   MSG_PORT: (typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.__tauriVersion) ? 2427 : 2426,
 

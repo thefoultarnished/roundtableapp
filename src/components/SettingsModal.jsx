@@ -16,7 +16,8 @@ export default function SettingsModal() {
   const [profilePicture, setProfilePicture] = useState('');
 
   useEffect(() => {
-    if (state.settingsOpen) {
+    // Sync state from localStorage when settings are opened
+    const syncSettings = () => {
       setDisplayName(localStorage.getItem('displayName') || 'Your Name');
       setUsername(localStorage.getItem('username') || 'RoundtableUser');
       setAutoDownload(localStorage.getItem('autoDownloadFiles') === 'true');
@@ -24,8 +25,14 @@ export default function SettingsModal() {
       setChatFont(localStorage.getItem('chatFont') || "'Inter', sans-serif");
       setFontScale(parseInt(localStorage.getItem('fontSizeScale') || '100'));
       setProfilePicture(localStorage.getItem('profilePicture') || '');
+    };
+
+    if (state.settingsOpen) {
+      syncSettings();
     }
   }, [state.settingsOpen]);
+
+  const closeSettings = () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: false });
 
   if (!state.settingsOpen) return null;
 
@@ -54,7 +61,7 @@ export default function SettingsModal() {
 
     setTimeout(() => {
       setSaveStatus('');
-      dispatch({ type: 'SET_SETTINGS_OPEN', payload: false });
+      closeSettings();
     }, 1500);
   };
 
@@ -78,14 +85,12 @@ export default function SettingsModal() {
     reader.readAsDataURL(f);
   };
 
-  const close = () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: false });
-
   const inputClass = "w-full px-3 py-2 text-xs rounded-xl bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/40 transition-all duration-300 text-slate-800 dark:text-slate-200 placeholder:text-slate-400/60 backdrop-blur-sm";
   const selectClass = "w-full p-2 text-[11px] rounded-xl bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 outline-none text-slate-800 dark:text-slate-200 cursor-pointer backdrop-blur-sm focus:ring-2 focus:ring-teal-500/30";
   const labelClass = "block text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1.5 ml-0.5";
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 modal-backdrop" onClick={(e) => e.target === e.currentTarget && close()}>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 modal-backdrop" onClick={(e) => e.target === e.currentTarget && closeSettings()}>
       <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-white/10 dark:border-white/5 flex justify-between items-center">
@@ -93,7 +98,7 @@ export default function SettingsModal() {
             <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-sm shadow-lg shadow-teal-500/20">⚙</span>
             <span>Settings</span>
           </h2>
-          <button onClick={close} className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 hover:rotate-90">
+          <button onClick={closeSettings} className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 hover:rotate-90">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -195,7 +200,7 @@ export default function SettingsModal() {
 
         {/* Footer */}
         <div className="px-5 py-4 border-t border-white/10 dark:border-white/5 flex justify-end gap-3">
-          <button onClick={close} className="px-5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:bg-white/10 transition-all duration-300">Cancel</button>
+          <button onClick={closeSettings} className="px-5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:bg-white/10 transition-all duration-300">Cancel</button>
           <button
             onClick={handleSave}
             className="px-8 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/40 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
