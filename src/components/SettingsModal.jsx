@@ -43,58 +43,63 @@ export default function SettingsModal() {
 
   const closeSettings = () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: false });
 
+  // AUTOSAVE LOGIC: Runs whenever any setting changes
+  useEffect(() => {
+    // Skip initial mount to prevent redundant status flash
+    if (!state.settingsOpen) return;
+
+    const performSave = () => {
+      // Persist to localStorage
+      localStorage.setItem('username', username);
+      localStorage.setItem('displayName', displayName);
+      localStorage.setItem('fontSizeScale', fontScale);
+      localStorage.setItem('autoDownloadFiles', autoDownload);
+      localStorage.setItem('appFont', appFont);
+      localStorage.setItem('chatFont', chatFont);
+      localStorage.setItem('windowTransparency', windowTransparency);
+      localStorage.setItem('transparencyLevel', transparencyLevel);
+      localStorage.setItem('windowOpacity', windowOpacity);
+      localStorage.setItem('theme', theme);
+
+      // Apply Visual CSS Variables
+      document.documentElement.style.setProperty('--app-font', appFont);
+      document.documentElement.style.setProperty('--chat-font', chatFont);
+      document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
+      document.documentElement.style.setProperty('--glass-opacity', transparencyLevel);
+      
+      // Apply Theme Classes
+      document.documentElement.classList.remove('dark', 'aurora');
+      if (theme === 'dark') document.documentElement.classList.add('dark');
+      if (theme === 'aurora') document.documentElement.classList.add('aurora');
+
+      // Apply Window Background Opacity
+      const root = document.getElementById('root');
+      if (root) {
+        if (windowTransparency) {
+           const isDark = theme === 'dark' || theme === 'aurora';
+           root.style.background = isDark 
+              ? `rgba(2, 6, 23, ${windowOpacity})` 
+              : `rgba(235, 238, 244, ${windowOpacity})`;
+        } else {
+           const isDark = theme === 'dark' || theme === 'aurora';
+           root.style.background = isDark ? '#020617' : '#e2e8f0';
+        }
+      }
+
+      // Briefly show saving status
+      setSaveStatus('Auto-Saving...');
+      const timer = setTimeout(() => setSaveStatus(''), 800);
+      return () => clearTimeout(timer);
+    };
+
+    const saveTimer = setTimeout(performSave, 400); // 400ms debounce
+    return () => clearTimeout(saveTimer);
+  }, [
+    displayName, username, autoDownload, appFont, chatFont, 
+    fontScale, theme, windowTransparency, transparencyLevel, windowOpacity
+  ]);
+
   if (!state.settingsOpen) return null;
-
-  const handleSave = () => {
-    const oldDisplayName = localStorage.getItem('displayName') || 'Roundtable User';
-    const oldUsername = localStorage.getItem('username') || 'Anonymous';
-
-    localStorage.setItem('username', username);
-    localStorage.setItem('displayName', displayName);
-    localStorage.setItem('fontSizeScale', fontScale);
-    localStorage.setItem('autoDownloadFiles', autoDownload);
-    localStorage.setItem('appFont', appFont);
-    localStorage.setItem('chatFont', chatFont);
-    localStorage.setItem('windowTransparency', windowTransparency);
-    localStorage.setItem('transparencyLevel', transparencyLevel);
-    localStorage.setItem('windowOpacity', windowOpacity);
-    localStorage.setItem('theme', theme);
-
-    document.documentElement.style.setProperty('--app-font', appFont);
-    document.documentElement.style.setProperty('--chat-font', chatFont);
-    document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
-    document.documentElement.style.setProperty('--glass-opacity', transparencyLevel);
-    
-    // Apply Theme
-    document.documentElement.classList.remove('dark', 'aurora');
-    if (theme === 'dark') document.documentElement.classList.add('dark');
-    if (theme === 'aurora') document.documentElement.classList.add('aurora');
-
-    // Apply Transparency
-    if (windowTransparency) {
-       const isDark = theme === 'dark' || theme === 'aurora';
-       // Use separate windowOpacity value
-       document.getElementById('root').style.background = isDark 
-          ? `rgba(2, 6, 23, ${windowOpacity})` 
-          : `rgba(235, 238, 244, ${windowOpacity})`;
-    } else {
-       // Force opaque backgrounds based on theme
-       const isDark = theme === 'dark' || theme === 'aurora';
-       document.getElementById('root').style.background = isDark ? '#020617' : '#e2e8f0';
-    }
-
-    if (displayName !== oldDisplayName || username !== oldUsername) {
-      announcePresence();
-      setTimeout(() => announcePresence(), 1000);
-      setSaveStatus('Updated! ✓');
-    } else {
-      setSaveStatus('Saved! ✓');
-    }
-
-    setTimeout(() => {
-      setSaveStatus('');
-    }, 2000);
-  };
 
   const handlePfpChange = (e) => {
     const f = e.target.files[0];
@@ -122,19 +127,26 @@ export default function SettingsModal() {
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 modal-backdrop" onClick={(e) => {
-      // Don't close if clicking on a dropdown (rendered via portal)
       if (e.target.closest('.z-\\[99999\\]')) return;
       if (e.target === e.currentTarget) closeSettings();
     }}>
-      <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden">
+      <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="p-5 border-b border-white/10 dark:border-white/5 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-3">
-            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-sm shadow-lg shadow-teal-500/20">⚙</span>
-            <span>Settings</span>
-          </h2>
-          <button onClick={closeSettings} className="p-2 rounded-app text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300 hover:rotate-90">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <div className="p-5 border-b border-white/10 dark:border-white/5 flex justify-between items-center bg-white/10">
+          <div className="flex flex-col">
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-3">
+              <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-sm shadow-lg shadow-teal-500/20">⚙</span>
+              <span>Settings</span>
+            </h2>
+            <p className="text-[9px] text-teal-500 font-bold uppercase tracking-widest mt-1 ml-11 h-3 animate-pulse">
+              {saveStatus}
+            </p>
+          </div>
+          <button 
+            onClick={closeSettings} 
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-slate-600 dark:text-slate-400 hover:bg-white/20 hover:text-red-500 dark:hover:text-red-400 hover:border-red-500/30 transition-all duration-300 hover:rotate-90 group"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -145,7 +157,7 @@ export default function SettingsModal() {
           {/* Column 1: Profile */}
           <div className="space-y-4">
             <SectionHeader color="teal" label="Profile" />
-            <div className="flex flex-col items-center p-4 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="flex flex-col items-center p-4 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="relative group mb-3">
                 <div className="w-20 h-20 rounded-full overflow-hidden ring-3 ring-white/20 group-hover:ring-teal-400/40 transition-all duration-400 shadow-lg">
                   <img
@@ -182,7 +194,7 @@ export default function SettingsModal() {
           {/* Column 2: Appearance */}
           <div className="space-y-4">
             <SectionHeader color="purple" label="Appearance" />
-            <div className="space-y-3 p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="space-y-3 p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div>
                 <label className={labelClass}>Theme</label>
                 <GlassDropdown
@@ -224,7 +236,7 @@ export default function SettingsModal() {
                 />
               </div>
             </div>
-            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="flex justify-between items-center mb-2">
                 <label className={labelClass + ' mb-0'}>Scale</label>
                 <span className="text-[10px] font-bold font-mono text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">{fontScale}%</span>
@@ -235,7 +247,7 @@ export default function SettingsModal() {
             
             {/* Window Transparency Toggle */}
             {/* Window Transparency Toggle */}
-             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
+             <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className={labelClass + ' mb-0'}>Transparency</span>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -293,11 +305,11 @@ export default function SettingsModal() {
           {/* Column 3: Network */}
           <div className="space-y-4">
             <SectionHeader color="blue" label="Network" />
-            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <label className={labelClass}>Connection Mode</label>
               <ConnectionModeToggle />
             </div>
-            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+            <div className="p-3 rounded-app bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="flex items-center justify-between">
                 <span className={labelClass + ' mb-0'}>Auto-Download</span>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -309,16 +321,6 @@ export default function SettingsModal() {
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-white/10 dark:border-white/5 flex justify-end gap-3">
-          <button onClick={closeSettings} className="px-5 py-2 rounded-app text-xs font-bold text-slate-400 hover:bg-white/10 transition-all duration-300">Cancel</button>
-          <button
-            onClick={handleSave}
-            className="px-8 py-2 rounded-app text-xs font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 shadow-lg shadow-teal-500/20 hover:shadow-teal-500/40 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0"
-          >
-            {saveStatus || 'Save Changes'}
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -343,9 +345,9 @@ function ConnectionModeToggle() {
 
   return (
     <>
-      <div className="relative bg-white/10 dark:bg-white/5 p-0.5 rounded-xl flex border border-white/15 dark:border-white/5 h-9 overflow-hidden">
+      <div className="relative bg-white/10 dark:bg-white/5 p-0.5 rounded-app flex border border-white/15 dark:border-white/5 h-9 overflow-hidden">
         <div
-          className="absolute top-0.5 bottom-0.5 w-[calc(50%-4px)] bg-gradient-to-r from-teal-500/20 to-cyan-500/20 dark:from-teal-500/15 dark:to-cyan-500/15 rounded-lg shadow-sm transition-all duration-400 z-0 backdrop-blur-sm border border-white/10"
+          className="absolute top-0.5 bottom-0.5 w-[calc(50%-4px)] bg-gradient-to-r from-teal-500/20 to-cyan-500/20 dark:from-teal-500/15 dark:to-cyan-500/15 rounded-app shadow-sm transition-all duration-400 z-0 backdrop-blur-sm border border-white/10"
           style={{ left: mode === 'online' ? 'calc(50%)' : '4px' }}
         />
         <button type="button" onClick={() => { setMode('lan'); localStorage.setItem('connectionMode', 'lan'); }}

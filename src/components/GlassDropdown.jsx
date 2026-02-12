@@ -91,7 +91,7 @@ export default function GlassDropdown({ value, options, onChange, className = ''
           }}
           className="z-[99999] rounded-app backdrop-blur-xl border border-white/30 dark:border-white/10 shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
         >
-          <div className="bg-white/70 dark:bg-slate-800/70">
+          <div className="bg-white/40 dark:bg-slate-800/40">
             {options.map((option) => (
               <button
                 key={option.value}
