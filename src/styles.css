@@ -1,5 +1,4 @@
 ﻿body {
-            font-family: 'Lexend', sans-serif;
             border-radius: 10px;
             overflow: hidden;
         }
@@ -10,6 +9,8 @@
 
         :root {
   --font-size-scale: 1;
+  --app-font: 'Inter', sans-serif;
+  --chat-font: 'Inter', sans-serif;
 }
 
 html, body {
@@ -18,7 +19,13 @@ html, body {
 }
 
 body {
+  font-family: var(--app-font);
   font-size: calc(100% * var(--font-size-scale));
+}
+
+/* Specific override for chat messages to use the chat font */
+.message-bubble p {
+    font-family: var(--chat-font);
 }
 
 #settings-modal {

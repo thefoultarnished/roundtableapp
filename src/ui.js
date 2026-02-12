@@ -35,9 +35,16 @@ export function initializeUI() {
     const summaryModal = document.getElementById('summary-modal');
     const closeChatBtn = document.getElementById('close-chat-btn');
 
+
     if (!localStorage.getItem('port')) {
         localStorage.setItem('port', state.MSG_PORT);
     }
+
+    // Load saved fonts
+    const savedAppFont = localStorage.getItem('appFont');
+    const savedChatFont = localStorage.getItem('chatFont');
+    if (savedAppFont) document.documentElement.style.setProperty('--app-font', savedAppFont);
+    if (savedChatFont) document.documentElement.style.setProperty('--chat-font', savedChatFont);
 
     [chatViewEl, messagesContainerEl, messageInputEl, messageFormEl].forEach(element => {
         element?.addEventListener('click', () => {
@@ -347,6 +354,14 @@ export function initializeUI() {
     localStorage.setItem('fontSizeScale', fontSize);
     localStorage.setItem('autoDownloadFiles', autoDownload);
 
+    const appFont = document.getElementById('settings-app-font').value;
+    const chatFont = document.getElementById('settings-chat-font').value;
+    localStorage.setItem('appFont', appFont);
+    localStorage.setItem('chatFont', chatFont);
+
+    document.documentElement.style.setProperty('--app-font', appFont);
+    document.documentElement.style.setProperty('--chat-font', chatFont);
+
     renderMyUserProfileFooter();
 
     document.documentElement.style.setProperty('--font-size-scale', fontSize / 100);
@@ -596,7 +611,7 @@ export function renderChatWindow() {
 export function createMessageBubble(message) {
   const isSentByMe = message.sender === 'me';
   const bubbleWrapper = document.createElement('div');
-  bubbleWrapper.className = `flex w-full ${isSentByMe ? 'justify-end' : 'justify-start'} my-1`;
+  bubbleWrapper.className = `message-bubble flex w-full ${isSentByMe ? 'justify-end' : 'justify-start'} my-1`;
   const animationClass = isSentByMe ? 'slide-in-right' : 'slide-in-left';
 
   if (message.fileTransfer) {
@@ -773,6 +788,17 @@ export function showSettings() {
     document.getElementById('settings-username').value = savedUsername;
     document.getElementById('settings-displayname').value = savedDisplayName;
     document.getElementById('settings-auto-download').checked = localStorage.getItem('autoDownloadFiles') === 'true';
+
+    // Set font dropdowns
+    const currentAppFont = localStorage.getItem('appFont') || "'Inter', sans-serif";
+    const currentChatFont = localStorage.getItem('chatFont') || "'Inter', sans-serif";
+    
+    // Check if element exists to avoid errors if HTML mismatch
+    const appFontEl = document.getElementById('settings-app-font');
+    if (appFontEl) appFontEl.value = currentAppFont;
+    
+    const chatFontEl = document.getElementById('settings-chat-font');
+    if (chatFontEl) chatFontEl.value = currentChatFont;
 
     settingsModal.classList.remove('hidden');
 
