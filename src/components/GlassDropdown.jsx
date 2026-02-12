@@ -65,6 +65,7 @@ export default function GlassDropdown({ value, options, onChange, className = ''
         type="button"
         onClick={toggleOpen}
         className="w-full px-3 py-2 text-[11px] rounded-app bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 text-slate-800 dark:text-slate-200 cursor-pointer backdrop-blur-sm transition-all duration-300 hover:bg-white/40 dark:hover:bg-white/10 hover:border-white/30 dark:hover:border-white/20 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/40 flex items-center justify-between"
+        style={value.includes("'") ? { fontFamily: value } : {}}
       >
         <span>{selectedLabel}</span>
         <svg 
@@ -104,6 +105,7 @@ export default function GlassDropdown({ value, options, onChange, className = ''
                     ? 'bg-teal-500/20 text-teal-600 dark:text-teal-400 font-semibold'
                     : 'text-slate-700 dark:text-slate-200 hover:bg-white/30 dark:hover:bg-white/10'
                 }`}
+                style={option.value.includes("'") ? { fontFamily: option.value } : {}}
               >
                 {option.label}
               </button>
