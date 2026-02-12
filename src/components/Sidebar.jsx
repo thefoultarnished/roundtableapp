@@ -38,24 +38,40 @@ export default function Sidebar() {
       style={{ height: 'calc(100vh - 16px)' }}
     >
       {/* Logo & Status Header */}
-      <div className="pt-4 pb-2 px-4 flex items-center justify-between" data-tauri-drag-region>
+      <div className="pt-2 pb-2 px-4 flex items-center justify-between" data-tauri-drag-region>
         {/* Left: Window Controls + Toggle */}
         <div className="flex items-center gap-3">
           {/* Window Controls */}
-          <div className="flex gap-1.5" data-tauri-drag-region>
-            <button className="w-3 h-3 rounded-full bg-red-400 hover:bg-red-500 shadow-sm transition-colors" onClick={() => window.__TAURI__?.window?.getCurrentWindow().close()} />
-            <button className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-sm transition-colors" onClick={() => window.__TAURI__?.window?.getCurrentWindow().minimize()} />
-            <button className="w-3 h-3 rounded-full bg-green-400 hover:bg-green-500 shadow-sm transition-colors" onClick={async () => {
+          <div className="flex gap-2 group/controls" data-tauri-drag-region>
+            <button className="w-3.5 h-3.5 rounded-full bg-[#FF5F57] hover:bg-[#FF5F57] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={() => window.__TAURI__?.window?.getCurrentWindow().close()}>
+              <svg className="w-2 h-2 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <button className="w-3.5 h-3.5 rounded-full bg-[#FEBC2E] hover:bg-[#FEBC2E] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={() => window.__TAURI__?.window?.getCurrentWindow().minimize()}>
+              <svg className="w-2 h-2 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+            <button className="w-3.5 h-3.5 rounded-full bg-[#28C840] hover:bg-[#28C840] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={async () => {
                  if (window.__TAURI__?.window) {
                    const win = window.__TAURI__.window.getCurrentWindow();
                    const max = await win.isMaximized();
                    max ? win.unmaximize() : win.maximize();
                  }
-            }} />
+            }}>
+              <svg className="w-1.5 h-1.5 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </button>
           </div>
 
           {/* Theme Toggle */}
-          <label className="relative inline-flex items-center cursor-pointer group modern-toggle scale-75 ml-1" title="Toggle Theme">
+          <label className="hidden relative inline-flex items-center cursor-pointer group modern-toggle scale-75 ml-1" title="Toggle Theme">
             <input
               type="checkbox"
               className="sr-only peer"

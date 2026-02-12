@@ -14,6 +14,13 @@ export default function ChatArea() {
   const [inputFocused, setInputFocused] = useState(false);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
   const [searchActive, setSearchActive] = useState(false);
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    if (searchActive && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [searchActive]);
 
   const activeUser = state.allUsers.find(u => u.id === state.activeChatUserId);
   const userMessages = state.activeChatUserId ? (state.messages[state.activeChatUserId] || []) : [];
@@ -260,25 +267,32 @@ export default function ChatArea() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
-            {/* Search Toggle */}
-             <div className="relative group flex items-center">
-               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${searchActive ? 'w-48 opacity-100 mr-2' : 'w-0 opacity-0'}`}>
-                 <input
-                   autoFocus={searchActive}
-                   type="text"
-                   placeholder="Search in chat..."
-                   className="w-full h-8 text-xs bg-white/10 border border-white/20 rounded-lg pl-3 pr-3 text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400/50 backdrop-blur-sm"
-                 />
-               </div>
+            {/* Search Toggle (Expandable) */}
+             <div className={`relative flex items-center transition-all duration-300 ease-out h-10 ${
+               searchActive 
+                 ? 'w-64 bg-white/10 rounded-xl ring-1 ring-cyan-400/30' 
+                 : 'w-10 bg-transparent rounded-lg hover:bg-white/5'
+             }`}>
                <button 
                  onClick={() => setSearchActive(!searchActive)}
-                 title="Search Messages" 
-                 className={`p-2.5 rounded-lg transition-all duration-300 ${searchActive ? 'text-cyan-400 bg-cyan-400/10' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                 title={searchActive ? "Close Search" : "Search Messages"}
+                 className={`absolute left-0 top-0 w-10 h-10 flex items-center justify-center transition-colors z-10 ${
+                   searchActive ? 'text-cyan-400' : 'text-slate-400 hover:text-white'
+                 }`}
                >
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                  </svg>
                </button>
+               
+               <input
+                 ref={searchInputRef}
+                 type="text"
+                 placeholder="Search..."
+                 className={`w-full h-full bg-transparent border-none outline-none text-xs text-white placeholder:text-slate-400 pl-10 pr-3 transition-opacity duration-200 ${
+                   searchActive ? 'opacity-100 cursor-text' : 'opacity-0 cursor-pointer pointer-events-none'
+                 }`}
+               />
              </div>
 
             {/* Close button */}
