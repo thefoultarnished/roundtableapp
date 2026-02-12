@@ -41,29 +41,8 @@ export default function Titlebar() {
 
   return (
     <div data-tauri-drag-region className="titlebar">
-      {/* Logo */}
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <h1 className="non-scalable text-lg font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
-            Roundtable
-          </h1>
-          {/* Subtle glow behind logo */}
-          <div className="absolute inset-0 bg-gradient-to-r from-teal-400/20 to-blue-500/20 blur-xl -z-10" />
-        </div>
-      </div>
-
-      {/* Search — Glass */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-        <div className="relative group">
-          <input
-            type="text"
-            placeholder="search conversations.."
-            className="w-52 h-6 text-[11px] bg-white/10 dark:bg-white/5 border border-white/20 dark:border-white/10 rounded-lg pl-7 pr-3 text-slate-700 dark:text-slate-300 placeholder:text-slate-400/70 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/50 focus:bg-white/20 dark:focus:bg-white/10 transition-all duration-400 backdrop-blur-sm"
-          />
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400/60 group-focus-within:text-teal-400 transition-colors duration-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
+      {/* Left side empty or could have context info */}
+      <div className="flex-1 flex items-center">
       </div>
 
       {/* Controls */}

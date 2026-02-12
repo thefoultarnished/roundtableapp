@@ -12,6 +12,8 @@ export default function ChatArea() {
   const textareaRef = useRef(null);
   const [inputValue, setInputValue] = useState('');
   const [inputFocused, setInputFocused] = useState(false);
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
+  const [searchActive, setSearchActive] = useState(false);
 
   const activeUser = state.allUsers.find(u => u.id === state.activeChatUserId);
   const userMessages = state.activeChatUserId ? (state.messages[state.activeChatUserId] || []) : [];
@@ -19,10 +21,17 @@ export default function ChatArea() {
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (messagesEndRef.current && isScrolledToBottom) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [userMessages.length]);
+  }, [userMessages.length, isScrolledToBottom]);
+
+  const handleScroll = () => {
+    if (messagesContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      setIsScrolledToBottom(scrollHeight - scrollTop - clientHeight < 100);
+    }
+  };
 
   // Auto-resize textarea
   const adjustTextarea = useCallback(() => {
@@ -101,44 +110,102 @@ export default function ChatArea() {
   // ===== Welcome Screen =====
   if (!state.activeChatUserId) {
     return (
-      <main id="chat-container" className="flex-grow flex flex-col m-2 ml-0 animated-gradient-bg rounded-2xl shadow-2xl z-10 min-w-[400px] glass-panel overflow-hidden">
-        <div id="welcome-screen" className="flex flex-col items-center justify-center h-full p-8 text-center relative">
-          <div className="relative mb-8">
-            {/* Animated icon */}
-            <div className="relative">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-28 h-28 text-slate-300/40 dark:text-slate-600/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2" />
-                <rect width="18" height="18" x="3" y="4" rx="2" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              {/* Glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-teal-400/20 to-cyan-400/20 blur-3xl rounded-full" />
-              {/* Orbiting dot */}
-              <div className="absolute w-3 h-3 rounded-full bg-teal-400 shadow-lg shadow-teal-400/50" style={{
-                animation: 'orbit 6s linear infinite',
-                top: '50%', left: '50%',
-              }} />
+      <main className="flex-1 h-full flex flex-col rounded-b-2xl shadow-2xl z-10 min-w-[400px] overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-white/5 border-t-0">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 right-20 w-96 h-96 bg-gradient-to-br from-cyan-500/10 to-teal-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+          <div className="absolute bottom-20 left-20 w-80 h-80 bg-gradient-to-tr from-blue-500/5 to-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
+        </div>
+
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center relative z-10">
+          {/* Icon container with floating animation */}
+          <div className="mb-12 relative">
+            <div className="animate-float" style={{ animation: 'float 3s ease-in-out infinite' }}>
+              <div className="relative w-32 h-32">
+                {/* Outer ring */}
+                <div className="absolute inset-0 rounded-full border-2 border-gradient-to-r from-cyan-400/30 to-teal-400/30 animate-spin" style={{ animationDuration: '8s', animationDirection: 'reverse' }} />
+                
+                {/* Inner glow */}
+                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-cyan-400/10 to-teal-400/10 blur-xl" />
+                
+                {/* Icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-32 h-32 text-white/20 relative" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2" />
+                  <rect width="18" height="18" x="3" y="4" rx="2" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+
+                {/* Orbiting particles */}
+                <div className="absolute w-2 h-2 rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/50" style={{
+                  animation: 'orbit 6s linear infinite',
+                  top: '50%', left: '50%',
+                  transformOrigin: '0 0',
+                }} />
+                <div className="absolute w-1.5 h-1.5 rounded-full bg-teal-400 shadow-lg shadow-teal-400/50" style={{
+                  animation: 'orbit 8s linear infinite',
+                  top: '50%', left: '50%',
+                  transformOrigin: '0 0',
+                  animationDelay: '2s'
+                }} />
+              </div>
             </div>
           </div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 dark:from-white dark:via-slate-200 dark:to-slate-400 bg-clip-text text-transparent mb-3">
-            Welcome to Roundtable
-          </h2>
-          <p className="text-base text-slate-500 dark:text-slate-400 max-w-md leading-relaxed">
-            Select a user from the sidebar to start a conversation
-          </p>
-          <div className="mt-8 flex gap-3">
-            <div className="px-4 py-2 rounded-xl bg-white/20 dark:bg-white/5 border border-white/20 dark:border-white/10 text-xs text-slate-500 dark:text-slate-400 backdrop-blur-sm">
-              🔒 End-to-end encrypted
-            </div>
-            <div className="px-4 py-2 rounded-xl bg-white/20 dark:bg-white/5 border border-white/20 dark:border-white/10 text-xs text-slate-500 dark:text-slate-400 backdrop-blur-sm">
-              📡 Peer-to-peer
-            </div>
+
+          {/* Text content */}
+          <div className="max-w-xl">
+            <h2 className="text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-400 via-blue-300 to-teal-400 bg-clip-text text-transparent leading-tight" style={{
+              fontFamily: '"Sohne", "Helvetica Neue", sans-serif',
+              fontWeight: '700',
+              letterSpacing: '-0.02em'
+            }}>
+              Welcome to Roundtable
+            </h2>
+            <p className="text-lg text-slate-400 leading-relaxed font-light">
+              Select a conversation from the sidebar to begin. Your messages are encrypted end-to-end and never stored.
+            </p>
+          </div>
+
+          {/* Feature badges with staggered animation */}
+          <div className="mt-12 flex flex-wrap gap-3 justify-center">
+            {[
+              { icon: '🔒', label: 'End-to-end encrypted', delay: '0s' },
+              { icon: '📡', label: 'Peer-to-peer', delay: '0.1s' },
+              { icon: '⚡', label: 'Real-time', delay: '0.2s' }
+            ].map((item, idx) => (
+              <div 
+                key={idx}
+                className="px-5 py-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 text-sm text-slate-300 backdrop-blur-md hover:border-cyan-400/30 hover:bg-cyan-400/5 transition-all duration-500 hover:scale-105 hover:shadow-lg hover:shadow-cyan-400/10"
+                style={{
+                  animation: 'fadeInUp 0.6s ease-out forwards',
+                  animationDelay: item.delay,
+                  opacity: 0
+                }}
+              >
+                <span className="mr-2">{item.icon}</span>
+                {item.label}
+              </div>
+            ))}
           </div>
         </div>
+
         <style>{`
           @keyframes orbit {
-            from { transform: translate(-50%, -50%) rotate(0deg) translateX(60px) rotate(0deg); }
-            to { transform: translate(-50%, -50%) rotate(360deg) translateX(60px) rotate(-360deg); }
+            from { transform: translate(-50%, -50%) rotate(0deg) translateX(48px) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg) translateX(48px) rotate(-360deg); }
+          }
+          @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+          }
+          @keyframes fadeInUp {
+            from { 
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to { 
+              opacity: 1;
+              transform: translateY(0);
+            }
           }
         `}</style>
       </main>
@@ -147,119 +214,234 @@ export default function ChatArea() {
 
   // ===== Active Chat =====
   return (
-    <main id="chat-container" className="flex-grow flex flex-col m-2 ml-0 animated-gradient-bg rounded-2xl shadow-2xl z-10 min-w-[400px] glass-panel overflow-hidden">
-      <div id="chat-view" className="flex flex-col flex-grow h-full">
-        {/* Chat header — Heavy glass */}
-        <header className="p-4 flex items-center justify-between space-x-4 flex-shrink-0 glass-panel-heavy rounded-t-2xl border-b border-white/10 dark:border-white/5">
+    <main className="flex-1 h-full flex flex-col rounded-2xl shadow-2xl z-10 min-w-[400px] overflow-hidden relative bg-gradient-to-b from-slate-900 to-slate-950 border border-white/5">
+      {/* Ambient background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-cyan-500/5 to-teal-500/5 blur-3xl" />
+      </div>
+
+      <div className="flex flex-col flex-grow h-full relative z-10">
+        {/* Chat header */}
+        <header className="px-6 py-4 flex items-center justify-between space-x-4 flex-shrink-0 border-b border-white/5 bg-gradient-to-r from-slate-900/80 to-slate-800/40 backdrop-blur-xl">
           <div className="flex items-center space-x-4 min-w-0">
-            {activeUser?.profile_picture ? (
-              <div className="w-11 h-11 rounded-full flex-shrink-0 shadow-lg ring-2 ring-white/20 overflow-hidden">
-                <img src={activeUser.profile_picture} className="w-full h-full object-cover" alt={activeUser.name} />
-              </div>
-            ) : (
-              <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-white text-xl flex-shrink-0 bg-gradient-to-br ${activeUser?.avatarGradient || 'from-teal-400 to-blue-500'} shadow-lg ring-2 ring-white/20`}>
-                {activeUser?.name?.charAt(0) || '?'}
-              </div>
-            )}
+            {/* Avatar */}
+            <div className="relative flex-shrink-0 group">
+              {activeUser?.profile_picture ? (
+                <div className="w-12 h-12 rounded-full shadow-lg ring-2 ring-cyan-400/20 overflow-hidden hover:ring-cyan-400/40 transition-all duration-300">
+                  <img src={activeUser.profile_picture} className="w-full h-full object-cover" alt={activeUser.name} />
+                </div>
+              ) : (
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0 bg-gradient-to-br ${activeUser?.avatarGradient || 'from-cyan-400 to-teal-500'} shadow-lg ring-2 ring-cyan-400/20 group-hover:ring-cyan-400/40 transition-all duration-300`}>
+                  {activeUser?.name?.charAt(0) || '?'}
+                </div>
+              )}
+              {/* Status indicator */}
+              <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-slate-900 ${activeUser?.status === 'online' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50' : 'bg-slate-600'} transition-all duration-300`} />
+            </div>
+
+            {/* User info */}
             <div className="min-w-0">
-              <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-white truncate flex items-center gap-2">
                 {activeUser?.name}
                 {activeUser?.username && (
-                  <span className="text-xs font-normal text-slate-400 dark:text-slate-500">@{activeUser.username}</span>
+                  <span className="text-xs font-normal text-slate-400">@{activeUser.username}</span>
                 )}
               </h2>
               <div className="flex items-center gap-2 text-xs">
-                <span className={`flex items-center gap-1 ${activeUser?.status === 'online' ? 'text-emerald-500' : 'text-slate-400'}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${activeUser?.status === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                <span className={`flex items-center gap-1 font-medium transition-colors duration-300 ${activeUser?.status === 'online' ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  <span className={`w-2 h-2 rounded-full ${activeUser?.status === 'online' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
                   {activeUser?.status}
                 </span>
-                <span className="text-slate-300 dark:text-slate-600">·</span>
-                <span className="text-slate-400 dark:text-slate-500 font-mono">{activeUser?.ip}</span>
+                <span className="text-slate-600">·</span>
+                <span className="text-slate-500 font-mono text-[10px]">{activeUser?.ip}</span>
               </div>
             </div>
           </div>
-          <button onClick={handleCloseChat} title="Close Chat" className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-2">
+            {/* Search Toggle */}
+             <div className="relative group flex items-center">
+               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${searchActive ? 'w-48 opacity-100 mr-2' : 'w-0 opacity-0'}`}>
+                 <input
+                   autoFocus={searchActive}
+                   type="text"
+                   placeholder="Search in chat..."
+                   className="w-full h-8 text-xs bg-white/10 border border-white/20 rounded-lg pl-3 pr-3 text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400/50 backdrop-blur-sm"
+                 />
+               </div>
+               <button 
+                 onClick={() => setSearchActive(!searchActive)}
+                 title="Search Messages" 
+                 className={`p-2.5 rounded-lg transition-all duration-300 ${searchActive ? 'text-cyan-400 bg-cyan-400/10' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                 </svg>
+               </button>
+             </div>
+
+            {/* Close button */}
+            <button 
+              onClick={handleCloseChat} 
+              title="Close Chat" 
+              className="p-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-red-500/10 transition-all duration-300 hover:scale-110 active:scale-95"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </header>
 
-        {/* Messages */}
-        <div id="messages-container" ref={messagesContainerRef} className="flex-grow p-4 overflow-y-auto space-y-2">
-          {groupedMessages.map((group, gi) => (
-            <React.Fragment key={gi}>
-              {/* Date separator */}
-              <div className="flex justify-center my-5">
-                <div className="px-4 py-1 rounded-full text-[10px] font-medium tracking-wider uppercase bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 text-slate-500 dark:text-slate-400 backdrop-blur-md shadow-sm">
-                  {group.dateLabel}
-                </div>
+        {/* Messages container */}
+        <div 
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-grow p-5 overflow-y-auto space-y-3 scroll-smooth"
+          style={{
+            scrollBehavior: 'smooth',
+            scrollbarWidth: 'thin',
+          }}
+        >
+          {groupedMessages.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-center">
+              <div>
+                <div className="text-4xl mb-3 opacity-50">💬</div>
+                <p className="text-slate-400 text-sm">No messages yet. Start the conversation!</p>
               </div>
-              {group.messages.map((msg, mi) => (
-                <MessageBubble key={`${gi}-${mi}`} message={msg} />
+            </div>
+          ) : (
+            <>
+              {groupedMessages.map((group, gi) => (
+                <React.Fragment key={gi}>
+                  {/* Date separator */}
+                  <div className="flex justify-center my-6">
+                    <div className="px-4 py-1.5 rounded-full text-[11px] font-semibold tracking-wide uppercase bg-gradient-to-r from-white/10 to-white/5 border border-white/10 text-slate-400 backdrop-blur-md shadow-sm hover:border-cyan-400/20 transition-all duration-300">
+                      {group.dateLabel}
+                    </div>
+                  </div>
+                  
+                  {/* Messages */}
+                  {group.messages.map((msg, mi) => (
+                    <div 
+                      key={`${gi}-${mi}`}
+                      style={{
+                        animation: 'slideIn 0.3s ease-out',
+                        animationDelay: `${mi * 30}ms`
+                      }}
+                    >
+                      <MessageBubble message={msg} />
+                    </div>
+                  ))}
+                </React.Fragment>
               ))}
-            </React.Fragment>
-          ))}
-          <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} className="h-2" />
+            </>
+          )}
+
+          {/* CSS for message animations */}
+          <style>{`
+            @keyframes slideIn {
+              from {
+                opacity: 0;
+                transform: translateY(10px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+            
+            div::-webkit-scrollbar {
+              width: 6px;
+            }
+            div::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            div::-webkit-scrollbar-thumb {
+              background: rgba(71, 85, 105, 0.5);
+              border-radius: 3px;
+            }
+            div::-webkit-scrollbar-thumb:hover {
+              background: rgba(71, 85, 105, 0.8);
+            }
+          `}</style>
         </div>
 
-        {/* File preview */}
+        {/* File preview section */}
         {state.selectedFiles.length > 0 && (
-          <div className="px-4 pb-2">
-            <div className="p-2.5 bg-white/20 dark:bg-white/5 rounded-xl flex flex-wrap gap-2 max-h-28 overflow-y-auto backdrop-blur-md border border-white/20 dark:border-white/10">
+          <div className="px-5 pb-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="p-3 bg-gradient-to-br from-cyan-500/10 to-teal-500/5 rounded-2xl flex flex-wrap gap-2.5 max-h-32 overflow-y-auto backdrop-blur-md border border-cyan-400/20 hover:border-cyan-400/40 transition-all duration-300">
               {state.selectedFiles.map((file, i) => (
-                <div key={i} className="flex items-center gap-2.5 glass-panel p-2.5 rounded-lg text-sm hover:scale-[1.02] transition-all duration-300 group">
-                  <span className="text-xl animate-float group-hover:scale-110 transition-transform">{utils.getFileIcon(file.type)}</span>
-                  <span className="text-slate-700 dark:text-slate-200 font-medium text-xs flex-1">{file.name.length > 20 ? `${file.name.substring(0, 18)}...` : file.name}</span>
-                  <span className="text-[10px] text-slate-400">{(file.size / 1024 / 1024).toFixed(2)}MB</span>
-                  <button className="w-5 h-5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white transition-all duration-300 flex items-center justify-center text-xs font-bold"
-                    onClick={() => dispatch({ type: 'REMOVE_SELECTED_FILE', payload: i })}>×</button>
+                <div 
+                  key={i} 
+                  className="flex items-center gap-2.5 bg-white/10 p-2.5 rounded-lg text-sm hover:scale-[1.02] transition-all duration-300 group border border-white/10 hover:border-cyan-400/30"
+                >
+                  <span className="text-lg group-hover:scale-125 transition-transform">{utils.getFileIcon(file.type)}</span>
+                  <span className="text-slate-200 font-medium text-xs flex-1 truncate">{file.name.length > 20 ? `${file.name.substring(0, 18)}...` : file.name}</span>
+                  <span className="text-[10px] text-slate-400 whitespace-nowrap">{(file.size / 1024 / 1024).toFixed(2)}MB</span>
+                  <button 
+                    className="w-5 h-5 rounded-full bg-red-500/20 text-red-300 hover:bg-red-500 hover:text-white transition-all duration-300 flex items-center justify-center text-xs font-bold hover:scale-110 active:scale-95"
+                    onClick={() => dispatch({ type: 'REMOVE_SELECTED_FILE', payload: i })}
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Message input — Glass bar */}
-        <footer className="p-4 flex-shrink-0">
-          <form id="message-form" onSubmit={handleSubmit}>
-            <div className={`relative glass-panel rounded-2xl overflow-hidden transition-all duration-400 ${inputFocused ? 'ring-2 ring-teal-500/30 shadow-lg shadow-teal-500/10 border-teal-500/30' : ''}`}>
+        {/* Message input footer */}
+        <footer className="p-5 flex-shrink-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent">
+          <form onSubmit={handleSubmit}>
+            <div className={`relative rounded-2xl overflow-hidden transition-all duration-300 ${
+              inputFocused 
+                ? 'ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-400/10 border-cyan-400/30' 
+                : 'border border-white/10 hover:border-white/20'
+            } bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl`}>
+              
               {/* Attachment button */}
               <button
                 type="button"
                 onClick={handleAttachment}
-                className="absolute left-3 bottom-3 p-1.5 text-slate-400 hover:text-teal-400 transition-all duration-300 hover:scale-110 z-10 rounded-lg hover:bg-teal-500/10"
+                className="absolute left-4 bottom-3.5 p-2 text-slate-400 hover:text-cyan-400 transition-all duration-300 hover:scale-110 rounded-lg hover:bg-cyan-400/10 active:scale-95"
                 title="Attach files"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                 </svg>
               </button>
 
+              {/* Textarea */}
               <textarea
                 ref={textareaRef}
-                id="message-input"
                 rows="1"
-                placeholder="Type a message..."
+                placeholder="Type a message... (Shift+Enter for new line)"
                 value={inputValue}
                 onChange={(e) => { setInputValue(e.target.value); adjustTextarea(); }}
                 onKeyDown={handleKeyDown}
                 onFocus={() => setInputFocused(true)}
                 onBlur={() => setInputFocused(false)}
-                className="w-full bg-transparent focus:outline-none text-sm text-white py-3 pl-12 pr-12 resize-none overflow-y-hidden min-h-[3rem] max-h-32 border-0 placeholder:text-slate-400/50"
+                className="w-full bg-transparent focus:outline-none text-sm text-white py-3.5 pl-14 pr-14 resize-none overflow-y-auto min-h-[3rem] max-h-32 border-0 placeholder:text-slate-500/60"
               />
 
               {/* Send button */}
               <button
                 type="submit"
                 disabled={!hasContent}
-                className={`absolute right-3 bottom-3 p-1.5 transition-all duration-300 z-10 rounded-lg hover:bg-white/10 ${hasContent ? 'enabled-glow scale-100' : 'opacity-40 scale-90'}`}
+                className={`absolute right-3.5 bottom-3.5 p-2.5 transition-all duration-300 rounded-lg hover:bg-cyan-400/10 active:scale-95 ${
+                  hasContent 
+                    ? 'scale-100 opacity-100 cursor-pointer' 
+                    : 'opacity-30 scale-90 cursor-not-allowed'
+                }`}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24">
                   <defs>
                     <linearGradient id="send-icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" className="grad-start" />
-                      <stop offset="100%" className="grad-end" />
+                      <stop offset="0%" stopColor="#06b6d4" />
+                      <stop offset="100%" stopColor="#14b8a6" />
                     </linearGradient>
                   </defs>
                   <path fill="url(#send-icon-gradient)" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />

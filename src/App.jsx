@@ -26,23 +26,19 @@ function AppContent() {
   useTheme();
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden relative">
+    <div className="h-screen flex flex-row overflow-hidden relative bg-slate-100 dark:bg-slate-900">
       {/* Animated background layers */}
       <AuroraBackground />
       <Particles />
 
-      {/* Glass titlebar */}
-      <Titlebar />
+      {/* Left Sidebar - Full Height */}
+      <Sidebar />
 
-      {/* Main layout */}
-      <div className="flex flex-1 pt-9 overflow-hidden relative z-10">
-        <Sidebar />
-        <div
-          id="resize-handle"
-          className="resize-handle"
-          title="Drag to resize sidebar"
-        />
-        <ChatArea />
+      {/* Right Content Area */}
+      <div className="flex flex-col flex-1 overflow-hidden relative z-10 ml-2 mr-2 my-2" style={{ height: 'calc(100vh - 16px)' }}>
+        <div className="flex-1 overflow-hidden relative w-full h-full">
+          <ChatArea />
+        </div>
       </div>
 
       {/* Modals & Notifications */}

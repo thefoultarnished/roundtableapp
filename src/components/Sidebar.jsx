@@ -33,21 +33,64 @@ export default function Sidebar() {
   return (
     <aside
       id="user-list-container"
-      className="glass-panel-heavy m-2 mr-0 rounded-2xl flex flex-col flex-shrink-0 z-10 min-w-[250px] w-[320px] max-w-[500px]"
+      className="glass-panel-heavy my-2 ml-2 rounded-2xl flex flex-col flex-shrink-0 z-10 w-[320px] max-w-[500px]"
+      style={{ height: 'calc(100vh - 16px)' }}
     >
-      {/* Animated status bar */}
-      <div id="sidebar-status" className="pt-3 pb-1 flex items-center justify-center gap-2 font-medium text-[11px]">
-        <span className="relative flex h-2.5 w-2.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-        </span>
-        <span className="text-emerald-600 dark:text-emerald-400 tracking-wide">
-          Connected
-        </span>
-        <span className="text-slate-400 dark:text-slate-500">·</span>
-        <span className="text-slate-500 dark:text-slate-400">
-          {onlineCount} user{onlineCount !== 1 ? 's' : ''} online
-        </span>
+      {/* Logo & Status Header */}
+      <div className="pt-4 pb-2 px-4 flex items-center justify-between">
+        {/* Left: Window Controls + Toggle */}
+        <div className="flex items-center gap-3">
+          {/* Window Controls */}
+          <div className="flex gap-1.5">
+            <button className="w-3 h-3 rounded-full bg-red-400 hover:bg-red-500 shadow-sm transition-colors" onClick={() => window.__TAURI__?.window?.getCurrentWindow().close()} />
+            <button className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-sm transition-colors" onClick={() => window.__TAURI__?.window?.getCurrentWindow().minimize()} />
+            <button className="w-3 h-3 rounded-full bg-green-400 hover:bg-green-500 shadow-sm transition-colors" onClick={async () => {
+                 if (window.__TAURI__?.window) {
+                   const win = window.__TAURI__.window.getCurrentWindow();
+                   const max = await win.isMaximized();
+                   max ? win.unmaximize() : win.maximize();
+                 }
+            }} />
+          </div>
+
+          {/* Theme Toggle */}
+          <label className="relative inline-flex items-center cursor-pointer group modern-toggle scale-75 ml-1" title="Toggle Theme">
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              onChange={(e) => {
+                if (e.target.checked) {
+                  document.documentElement.classList.add('dark');
+                  localStorage.setItem('theme', 'dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                  localStorage.setItem('theme', 'light');
+                }
+              }}
+              defaultChecked={document.documentElement.classList.contains('dark')}
+            />
+            <div className="toggle-track w-[32px] h-[16px] bg-gradient-to-br from-amber-100 to-orange-200 dark:from-indigo-800 dark:to-slate-900 rounded-full peer-focus:outline-none transition-all duration-500 ease-out shadow-inner border border-white/30 dark:border-white/10">
+              <div className="toggle-thumb absolute top-[1.5px] left-[1.5px] bg-gradient-to-br from-amber-400 to-orange-400 dark:from-indigo-400 dark:to-blue-500 rounded-full h-[13px] w-[13px] flex items-center justify-center transition-all duration-500 ease-out shadow-lg peer-checked:translate-x-[16px]">
+                <svg className="sun-icon h-[7px] w-[7px] text-white transition-all duration-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                </svg>
+                <svg className="moon-icon absolute h-[7px] w-[7px] text-white transition-all duration-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                </svg>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        {/* Right: Logo */}
+        <div className="flex flex-col items-end">
+          <h1 className="non-scalable text-lg font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
+            Roundtable
+          </h1>
+          <div className="hidden flex items-center gap-2 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+             <span>Connected</span>
+          </div>
+        </div>
       </div>
 
       {/* Search — Glass input */}
