@@ -33,15 +33,16 @@ export default function Sidebar() {
   return (
     <aside
       id="user-list-container"
+      data-tauri-drag-region
       className="glass-panel my-2 ml-2 rounded-2xl flex flex-col flex-shrink-0 z-10 w-[320px] max-w-[500px]"
       style={{ height: 'calc(100vh - 16px)' }}
     >
       {/* Logo & Status Header */}
-      <div className="pt-4 pb-2 px-4 flex items-center justify-between">
+      <div className="pt-4 pb-2 px-4 flex items-center justify-between" data-tauri-drag-region>
         {/* Left: Window Controls + Toggle */}
         <div className="flex items-center gap-3">
           {/* Window Controls */}
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5" data-tauri-drag-region>
             <button className="w-3 h-3 rounded-full bg-red-400 hover:bg-red-500 shadow-sm transition-colors" onClick={() => window.__TAURI__?.window?.getCurrentWindow().close()} />
             <button className="w-3 h-3 rounded-full bg-yellow-400 hover:bg-yellow-500 shadow-sm transition-colors" onClick={() => window.__TAURI__?.window?.getCurrentWindow().minimize()} />
             <button className="w-3 h-3 rounded-full bg-green-400 hover:bg-green-500 shadow-sm transition-colors" onClick={async () => {
@@ -83,7 +84,7 @@ export default function Sidebar() {
         </div>
 
         {/* Right: Logo */}
-        <div className="flex flex-col items-end">
+        <div className="flex flex-col items-end" data-tauri-drag-region>
           <h1 className="non-scalable text-lg font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
             Roundtable
           </h1>
