@@ -34,7 +34,12 @@ function AppContent() {
        
        document.documentElement.style.setProperty('--glass-opacity', level); 
        
-       const isDark = document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark';
+       const savedTheme = localStorage.getItem('theme') || 'light';
+       document.documentElement.classList.remove('dark', 'aurora');
+       if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+       if (savedTheme === 'aurora') document.documentElement.classList.add('aurora');
+
+       const isDark = savedTheme === 'dark' || savedTheme === 'aurora';
        document.getElementById('root').style.background = isDark 
           ? `rgba(2, 6, 23, ${winOpacity})` 
           : `rgba(235, 238, 244, ${winOpacity})`;

@@ -1,0 +1,64 @@
+@import url("index.css");
+
+/* ==========================================
+   CUSTOM DROPDOWN STYLING
+   Glassmorphic Select Elements
+   ========================================== */
+
+/* Remove default browser styles */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+
+/* Base custom select style (overrides tailwind classes usually) */
+.glass-select {
+    background-color: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: var(--text-primary);
+    box-shadow: var(--glass-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-select:hover {
+    background-color: var(--glass-bg-heavy);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.glass-select:focus {
+    outline: none;
+    border-color: rgba(20, 184, 166, 0.5); /* Teal accent */
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2), var(--glass-shadow);
+}
+
+/* Dark mode specific tweaks */
+.dark .glass-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+
+/* Option styling (Note: Options are hard to style cross-browser, but we can try) */
+.glass-select option {
+    background-color: #f8fafc; /* Slate 50 */
+    color: #1e293b; /* Slate 800 */
+    padding: 10px;
+}
+
+.dark .glass-select option {
+    background-color: #1e293b; /* Slate 800 */
+    color: #f1f5f9; /* Slate 100 */
+}
+
+/* Aurora Mode overrides */
+.aurora .glass-select:focus {
+    border-color: rgba(56, 189, 248, 0.5); /* Sky blue accent */
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2), var(--glass-shadow);
+}

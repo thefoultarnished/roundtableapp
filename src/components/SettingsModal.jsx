@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useNetwork } from '../hooks/useNetwork';
+import GlassDropdown from './GlassDropdown';
 
 export default function SettingsModal() {
   const { state, dispatch } = useAppContext();
@@ -13,6 +14,7 @@ export default function SettingsModal() {
   const [chatFont, setChatFont] = useState("'Inter', sans-serif");
   const [fontScale, setFontScale] = useState(100);
   const [saveStatus, setSaveStatus] = useState('');
+  const [theme, setTheme] = useState('light');
   const [profilePicture, setProfilePicture] = useState('');
   const [windowTransparency, setWindowTransparency] = useState(true);
   const [transparencyLevel, setTransparencyLevel] = useState(0.75); // UI Glass
@@ -27,6 +29,7 @@ export default function SettingsModal() {
       setAppFont(localStorage.getItem('appFont') || "'Inter', sans-serif");
       setChatFont(localStorage.getItem('chatFont') || "'Inter', sans-serif");
       setFontScale(parseInt(localStorage.getItem('fontSizeScale') || '100'));
+      setTheme(localStorage.getItem('theme') || 'light');
       setProfilePicture(localStorage.getItem('profilePicture') || '');
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
@@ -55,22 +58,28 @@ export default function SettingsModal() {
     localStorage.setItem('windowTransparency', windowTransparency);
     localStorage.setItem('transparencyLevel', transparencyLevel);
     localStorage.setItem('windowOpacity', windowOpacity);
+    localStorage.setItem('theme', theme);
 
     document.documentElement.style.setProperty('--app-font', appFont);
     document.documentElement.style.setProperty('--chat-font', chatFont);
     document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
     document.documentElement.style.setProperty('--glass-opacity', transparencyLevel);
     
+    // Apply Theme
+    document.documentElement.classList.remove('dark', 'aurora');
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    if (theme === 'aurora') document.documentElement.classList.add('aurora');
+
     // Apply Transparency
     if (windowTransparency) {
-       const isDark = document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark';
+       const isDark = theme === 'dark' || theme === 'aurora';
        // Use separate windowOpacity value
        document.getElementById('root').style.background = isDark 
           ? `rgba(2, 6, 23, ${windowOpacity})` 
           : `rgba(235, 238, 244, ${windowOpacity})`;
     } else {
        // Force opaque backgrounds based on theme
-       const isDark = document.documentElement.classList.contains('dark');
+       const isDark = theme === 'dark' || theme === 'aurora';
        document.getElementById('root').style.background = isDark ? '#020617' : '#e2e8f0';
     }
 
@@ -84,8 +93,7 @@ export default function SettingsModal() {
 
     setTimeout(() => {
       setSaveStatus('');
-      closeSettings();
-    }, 1500);
+    }, 2000);
   };
 
   const handlePfpChange = (e) => {
@@ -109,11 +117,15 @@ export default function SettingsModal() {
   };
 
   const inputClass = "w-full px-3 py-2 text-xs rounded-app bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/40 transition-all duration-300 text-slate-800 dark:text-slate-200 placeholder:text-slate-400/60 backdrop-blur-sm";
-  const selectClass = "w-full p-2 text-[11px] rounded-app bg-white/30 dark:bg-white/5 border border-white/20 dark:border-white/10 outline-none text-slate-800 dark:text-slate-200 cursor-pointer backdrop-blur-sm focus:ring-2 focus:ring-teal-500/30";
+  const selectClass = "w-full p-2 text-[11px] rounded-app glass-select outline-none text-slate-800 dark:text-slate-200 cursor-pointer";
   const labelClass = "block text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1.5 ml-0.5";
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 modal-backdrop" onClick={(e) => e.target === e.currentTarget && closeSettings()}>
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 modal-backdrop" onClick={(e) => {
+      // Don't close if clicking on a dropdown (rendered via portal)
+      if (e.target.closest('.z-\\[99999\\]')) return;
+      if (e.target === e.currentTarget) closeSettings();
+    }}>
       <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="p-5 border-b border-white/10 dark:border-white/5 flex justify-between items-center">
@@ -172,24 +184,44 @@ export default function SettingsModal() {
             <SectionHeader color="purple" label="Appearance" />
             <div className="space-y-3 p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div>
+                <label className={labelClass}>Theme</label>
+                <GlassDropdown
+                  value={theme}
+                  onChange={(val) => setTheme(val)}
+                  options={[
+                    { value: 'light', label: 'Light' },
+                    { value: 'dark', label: 'Dark' },
+                    { value: 'aurora', label: 'Aurora' }
+                  ]}
+                />
+              </div>
+              <div>
                 <label className={labelClass}>App Font</label>
-                <select value={appFont} onChange={(e) => setAppFont(e.target.value)} className={selectClass}>
-                  <option value="'Inter', sans-serif">Inter (Clean)</option>
-                  <option value="'Roboto', sans-serif">Roboto</option>
-                  <option value="'Montserrat', sans-serif">Montserrat</option>
-                  <option value="'Space Grotesk', sans-serif">Space Tech</option>
-                  <option value="'Comic Sans MS', cursive">Comic Sans</option>
-                </select>
+                <GlassDropdown
+                  value={appFont}
+                  onChange={(val) => setAppFont(val)}
+                  options={[
+                    { value: "'Inter', sans-serif", label: 'Inter (Clean)' },
+                    { value: "'Roboto', sans-serif", label: 'Roboto' },
+                    { value: "'Montserrat', sans-serif", label: 'Montserrat' },
+                    { value: "'Space Grotesk', sans-serif", label: 'Space Tech' },
+                    { value: "'Comic Sans MS', cursive", label: 'Comic Sans' }
+                  ]}
+                />
               </div>
               <div>
                 <label className={labelClass}>Chat Font</label>
-                <select value={chatFont} onChange={(e) => setChatFont(e.target.value)} className={selectClass}>
-                  <option value="'Inter', sans-serif">Inter (Clean)</option>
-                  <option value="'Roboto Mono', monospace">Roboto Mono</option>
-                  <option value="'Fira Code', monospace">Fira Code</option>
-                  <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
-                  <option value="'Space Grotesk', sans-serif">Space Tech</option>
-                </select>
+                <GlassDropdown
+                  value={chatFont}
+                  onChange={(val) => setChatFont(val)}
+                  options={[
+                    { value: "'Inter', sans-serif", label: 'Inter (Clean)' },
+                    { value: "'Roboto Mono', monospace", label: 'Roboto Mono' },
+                    { value: "'Fira Code', monospace", label: 'Fira Code' },
+                    { value: "'JetBrains Mono', monospace", label: 'JetBrains Mono' },
+                    { value: "'Space Grotesk', sans-serif", label: 'Space Tech' }
+                  ]}
+                />
               </div>
             </div>
             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">

@@ -2,6 +2,7 @@
    ROUNDTABLE — GLASSMORPHIC DESIGN SYSTEM
    Premium frosted-glass UI with animations
    ==================================== */
+@import url("dropdowns.css");
 
 /* --- CSS Variables & Design Tokens --- */
 :root {
@@ -45,9 +46,13 @@
   --aurora-4: rgba(236, 72, 153, 0.08);
 }
 
-.dark {
+html.dark .glass-panel, html.dark .glass-panel-heavy {
+  color: var(--text-primary);
+}
+
+html.dark {
   /* Dark Mode — Deep & Rich */
-  --glass-opacity: 0.35; /* Much more transparent base for dark mode */
+  --glass-opacity: 0.35; 
   --glass-bg: rgba(30, 41, 59, var(--glass-opacity));
   --glass-bg-heavy: rgba(15, 23, 42, calc(var(--glass-opacity) + 0.1));
   --glass-bg-light: rgba(30, 41, 59, calc(var(--glass-opacity) - 0.15));
@@ -73,6 +78,15 @@
   --aurora-2: rgba(6, 182, 212, 0.06);
   --aurora-3: rgba(139, 92, 246, 0.06);
   --aurora-4: rgba(236, 72, 153, 0.04);
+}
+
+html.aurora {
+  --glass-bg: rgba(20, 30, 40, var(--glass-opacity));
+  --glass-bg-heavy: rgba(10, 20, 30, calc(var(--glass-opacity) + 0.15));
+  --glass-border: rgba(56, 189, 248, 0.2); 
+  --glass-highlight: rgba(56, 189, 248, 0.1);
+  --text-primary: #f0f9ff;
+  --text-secondary: #bae6fd;
 }
 
 /* Global Roundness Variable */
