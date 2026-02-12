@@ -33,7 +33,7 @@ export default function Sidebar() {
   return (
     <aside
       id="user-list-container"
-      className="glass-panel-heavy my-2 ml-2 rounded-2xl flex flex-col flex-shrink-0 z-10 w-[320px] max-w-[500px]"
+      className="glass-panel my-2 ml-2 rounded-2xl flex flex-col flex-shrink-0 z-10 w-[320px] max-w-[500px]"
       style={{ height: 'calc(100vh - 16px)' }}
     >
       {/* Logo & Status Header */}

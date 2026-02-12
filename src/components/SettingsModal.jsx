@@ -14,6 +14,9 @@ export default function SettingsModal() {
   const [fontScale, setFontScale] = useState(100);
   const [saveStatus, setSaveStatus] = useState('');
   const [profilePicture, setProfilePicture] = useState('');
+  const [windowTransparency, setWindowTransparency] = useState(true);
+  const [transparencyLevel, setTransparencyLevel] = useState(0.75); // UI Glass
+  const [windowOpacity, setWindowOpacity] = useState(0.70); // Main Background
 
   useEffect(() => {
     // Sync state from localStorage when settings are opened
@@ -25,6 +28,9 @@ export default function SettingsModal() {
       setChatFont(localStorage.getItem('chatFont') || "'Inter', sans-serif");
       setFontScale(parseInt(localStorage.getItem('fontSizeScale') || '100'));
       setProfilePicture(localStorage.getItem('profilePicture') || '');
+      setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
+      setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
+      setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
     };
 
     if (state.settingsOpen) {
@@ -46,10 +52,27 @@ export default function SettingsModal() {
     localStorage.setItem('autoDownloadFiles', autoDownload);
     localStorage.setItem('appFont', appFont);
     localStorage.setItem('chatFont', chatFont);
+    localStorage.setItem('windowTransparency', windowTransparency);
+    localStorage.setItem('transparencyLevel', transparencyLevel);
+    localStorage.setItem('windowOpacity', windowOpacity);
 
     document.documentElement.style.setProperty('--app-font', appFont);
     document.documentElement.style.setProperty('--chat-font', chatFont);
     document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
+    document.documentElement.style.setProperty('--glass-opacity', transparencyLevel);
+    
+    // Apply Transparency
+    if (windowTransparency) {
+       const isDark = document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark';
+       // Use separate windowOpacity value
+       document.getElementById('root').style.background = isDark 
+          ? `rgba(2, 6, 23, ${windowOpacity})` 
+          : `rgba(235, 238, 244, ${windowOpacity})`;
+    } else {
+       // Force opaque backgrounds based on theme
+       const isDark = document.documentElement.classList.contains('dark');
+       document.getElementById('root').style.background = isDark ? '#020617' : '#e2e8f0';
+    }
 
     if (displayName !== oldDisplayName || username !== oldUsername) {
       announcePresence();
@@ -176,6 +199,62 @@ export default function SettingsModal() {
               </div>
               <input type="range" min="50" max="200" step="10" value={fontScale} onChange={(e) => setFontScale(e.target.value)}
                 className="w-full h-1.5 rounded-lg appearance-none bg-white/20 dark:bg-white/10 accent-purple-500 cursor-pointer" />
+            </div>
+            
+            {/* Window Transparency Toggle */}
+            {/* Window Transparency Toggle */}
+             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className={labelClass + ' mb-0'}>Transparency</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={windowTransparency} 
+                    onChange={(e) => setWindowTransparency(e.target.checked)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-9 h-5 bg-white/20 dark:bg-white/10 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-purple-500 peer-checked:to-indigo-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 after:shadow-lg" />
+                </label>
+              </div>
+
+              {/* Transparency Level Slider */}
+              {windowTransparency && (
+                <div className="animate-fade-in-down space-y-3">
+                  {/* UI Glass Opacity */}
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-[9px] text-slate-400 font-medium">UI Glass Opacity</label>
+                      <span className="text-[9px] font-mono text-slate-500">{Math.round(transparencyLevel * 100)}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="100" 
+                      step="5" 
+                      value={transparencyLevel * 100} 
+                      onChange={(e) => setTransparencyLevel(e.target.value / 100)}
+                      className="w-full h-1.5 rounded-lg appearance-none bg-white/20 dark:bg-white/10 accent-indigo-500 cursor-pointer" 
+                    />
+                  </div>
+                  
+                  {/* Background Opacity */}
+                  <div>
+                   <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-[9px] text-slate-400 font-medium">Win. Background Opacity</label>
+                      <span className="text-[9px] font-mono text-slate-500">{Math.round(windowOpacity * 100)}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      step="5" 
+                      value={windowOpacity * 100} 
+                      onChange={(e) => setWindowOpacity(e.target.value / 100)}
+                      className="w-full h-1.5 rounded-lg appearance-none bg-white/20 dark:bg-white/10 accent-teal-500 cursor-pointer" 
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

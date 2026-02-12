@@ -110,7 +110,7 @@ export default function ChatArea() {
   // ===== Welcome Screen =====
   if (!state.activeChatUserId) {
     return (
-      <main className="flex-1 h-full flex flex-col rounded-b-2xl shadow-2xl z-10 min-w-[400px] overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-white/5 border-t-0">
+      <main className="glass-panel flex-1 h-full flex flex-col rounded-2xl z-10 min-w-[400px] overflow-hidden relative">
         {/* Animated background elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-20 right-20 w-96 h-96 bg-gradient-to-br from-cyan-500/10 to-teal-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
@@ -214,7 +214,7 @@ export default function ChatArea() {
 
   // ===== Active Chat =====
   return (
-    <main className="flex-1 h-full flex flex-col rounded-2xl shadow-2xl z-10 min-w-[400px] overflow-hidden relative bg-gradient-to-b from-slate-900 to-slate-950 border border-white/5">
+    <main className="glass-panel flex-1 h-full flex flex-col rounded-2xl z-10 min-w-[400px] overflow-hidden relative">
       {/* Ambient background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-cyan-500/5 to-teal-500/5 blur-3xl" />
@@ -222,7 +222,7 @@ export default function ChatArea() {
 
       <div className="flex flex-col flex-grow h-full relative z-10">
         {/* Chat header */}
-        <header className="px-6 py-4 flex items-center justify-between space-x-4 flex-shrink-0 border-b border-white/5 bg-gradient-to-r from-slate-900/80 to-slate-800/40 backdrop-blur-xl">
+        <header className="px-6 py-4 flex items-center justify-between space-x-4 flex-shrink-0 border-b border-white/5 backdrop-blur-xl">
           <div className="flex items-center space-x-4 min-w-0">
             {/* Avatar */}
             <div className="relative flex-shrink-0 group">
