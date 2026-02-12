@@ -911,11 +911,37 @@ export function createParticles() {
 
 export function initializeModernToggle() {
     const toggle = document.getElementById('theme-toggle');
-    const label = toggle.closest('.modern-toggle');
+    const label = toggle ? toggle.closest('.modern-toggle') : null;
 
     if (!toggle || !label) return;
 
-    label.addEventListener('click', (e) => {
+    // 1. Initialize State from LocalStorage
+    const storedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    // Default to dark if stored is 'dark' or if no stored preference but system prefers dark
+    // Adjust logic based on your preferred default. Here assuming default light if not specified, unless system is dark.
+    const isDark = storedTheme === 'dark' || (!storedTheme && systemPrefersDark);
+
+    if (isDark) {
+        document.documentElement.classList.add('dark');
+        toggle.checked = true;
+    } else {
+        document.documentElement.classList.remove('dark');
+        toggle.checked = false;
+    }
+
+    // 2. Add Event Listener
+    toggle.addEventListener('change', (e) => {
+        if (toggle.checked) {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        }
+        
+        // Trigger visual effects
         createClickParticles(e, label);
         label.style.transform = 'scale(0.95)';
         setTimeout(() => {
