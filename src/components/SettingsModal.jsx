@@ -132,28 +132,26 @@ export default function SettingsModal() {
     }}>
       <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
         {/* Header */}
-        <div className="p-5 border-b border-white/10 dark:border-white/5 flex justify-between items-center bg-white/10">
-          <div className="flex flex-col">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-3">
-              <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-sm shadow-lg shadow-teal-500/20">⚙</span>
-              <span>Settings</span>
-            </h2>
-            <p className="text-[9px] text-teal-500 font-bold uppercase tracking-widest mt-1 ml-11 h-3 animate-pulse">
+        <div className="py-3 px-5 border-b border-white/20 dark:border-white/20 flex justify-between items-center">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-3">
+            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-sm shadow-lg shadow-teal-500/20">⚙</span>
+            <span>Settings</span>
+            <span className="text-[9px] text-teal-500 font-bold uppercase tracking-widest ml-4 h-3 animate-pulse self-center mt-1">
               {saveStatus}
-            </p>
-          </div>
+            </span>
+          </h2>
           <button 
             onClick={closeSettings} 
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-slate-600 dark:text-slate-400 hover:bg-white/20 hover:text-red-500 dark:hover:text-red-400 hover:border-red-500/30 transition-all duration-300 hover:rotate-90 group"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-slate-600 dark:text-slate-400 hover:bg-white/20 hover:text-red-500 dark:hover:text-red-400 hover:border-red-500/30 transition-all duration-300 hover:rotate-90 group"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="px-5 pt-4 pb-10 grid grid-cols-1 md:grid-cols-3 gap-5">
           {/* Column 1: Profile */}
           <div className="space-y-4">
             <SectionHeader color="teal" label="Profile" />
@@ -247,7 +245,7 @@ export default function SettingsModal() {
             
             {/* Window Transparency Toggle */}
             {/* Window Transparency Toggle */}
-             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
+             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3 mb-10">
               <div className="flex items-center justify-between">
                 <span className={labelClass + ' mb-0'}>Transparency</span>
                 <label className="relative inline-flex items-center cursor-pointer">
@@ -342,26 +340,62 @@ function SectionHeader({ color, label }) {
 
 function ConnectionModeToggle() {
   const [mode, setMode] = useState(localStorage.getItem('connectionMode') || 'lan');
+  const [serverUrl, setServerUrl] = useState(localStorage.getItem('relayServerUrl') || 'ws://129.154.231.157:8080');
+
+  useEffect(() => {
+    localStorage.setItem('connectionMode', mode);
+    window.dispatchEvent(new Event('settings-changed'));
+  }, [mode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        localStorage.setItem('relayServerUrl', serverUrl);
+        window.dispatchEvent(new Event('settings-changed'));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [serverUrl]);
 
   return (
-    <>
-      <div className="relative bg-white/10 dark:bg-white/5 p-0.5 rounded-app flex border border-white/15 dark:border-white/5 h-9 overflow-hidden">
-        <div
-          className="absolute top-0.5 bottom-0.5 w-[calc(50%-4px)] bg-gradient-to-r from-teal-500/20 to-cyan-500/20 dark:from-teal-500/15 dark:to-cyan-500/15 rounded-app shadow-sm transition-all duration-400 z-0 backdrop-blur-sm border border-white/10"
-          style={{ left: mode === 'online' ? 'calc(50%)' : '4px' }}
+    <div className="flex flex-col gap-3">
+      <div className="relative bg-white/10 dark:bg-white/5 p-1 rounded-xl flex border border-white/10 h-10">
+        {/* Sliding Background */}
+        <div 
+            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg shadow-sm transition-all duration-300 z-0 backdrop-blur-md border border-white/10 ${mode === 'online' ? 'left-[calc(50%)] bg-purple-500/20' : 'left-1 bg-teal-500/20'}`}
         />
-        <button type="button" onClick={() => { setMode('lan'); localStorage.setItem('connectionMode', 'lan'); }}
-          className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'lan' ? 'text-teal-500' : 'text-slate-400'}`}>
+        
+        <button 
+            type="button" 
+            onClick={() => setMode('lan')}
+            className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'lan' ? 'text-teal-400' : 'text-slate-400'}`}
+        >
           LAN
         </button>
-        <button type="button" onClick={() => { setMode('online'); localStorage.setItem('connectionMode', 'online'); }}
-          className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'online' ? 'text-purple-500' : 'text-slate-400'}`}>
+        <button 
+            type="button" 
+            onClick={() => setMode('online')}
+            className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'online' ? 'text-purple-400' : 'text-slate-400'}`}
+        >
           ONLINE
         </button>
       </div>
-      <p className="mt-2 text-[8px] text-center text-slate-400/60 uppercase tracking-wider">
-        {mode === 'online' ? 'Internet-wide via Relay' : 'Local network broadcast'}
+
+      <p className="text-[9px] text-center text-slate-500 uppercase tracking-wider font-bold">
+        {mode === 'online' ? 'Global Relay Network' : 'Local Area Network'}
       </p>
-    </>
+
+      {/* Server URL Input (Only for Online Mode) */}
+      {mode === 'online' && (
+        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Relay Server URL</label>
+            <input 
+                type="text" 
+                value={serverUrl} 
+                onChange={(e) => setServerUrl(e.target.value)}
+                placeholder="ws://123.45.67.89:8080"
+                className="w-full px-3 py-2 text-[10px] font-mono rounded-lg bg-black/20 border border-white/10 text-slate-300 placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-purple-500/50 transition-all"
+            />
+        </div>
+      )}
+    </div>
   );
 }

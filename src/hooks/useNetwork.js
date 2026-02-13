@@ -1,14 +1,29 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import * as utils from '../utils';
 
 export function useNetwork() {
-  const { state, dispatch, getState } = useAppContext();
+  const { state, dispatch, getState, online } = useAppContext();
   const getStateRef = useRef(getState);
   getStateRef.current = getState;
 
+  const { connect, sendMessageOnline, isOnline } = online;
+
   const sendMessage = useCallback((message, targetIp, targetPort) => {
     const currentState = getStateRef.current();
+    const mode = localStorage.getItem('connectionMode');
+
+    // --- ONLINE MODE ---
+    if (mode === 'online') {
+        if (!isOnline) {
+            console.warn("Offline. Cannot send message.");
+            return;
+        }
+        sendMessageOnline(String(currentState.activeChatUserId), message);
+        return;
+    }
+
+    // --- LAN MODE (Existing Logic) ---
     let invokeFunc = currentState.globalInvokeFunc;
 
     if (!invokeFunc) {
@@ -44,7 +59,7 @@ export function useNetwork() {
       .catch((err) => {
         console.error('Error sending message:', err);
       });
-  }, []);
+  }, [isOnline, sendMessageOnline]);
 
   const announcePresence = useCallback(() => {
     const currentState = getStateRef.current();

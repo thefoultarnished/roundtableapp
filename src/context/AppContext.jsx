@@ -1,24 +1,57 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
+import { useOnlineMode } from '../hooks/useOnlineMode';
 
 const AppContext = createContext(null);
 
 const initialState = {
   messages: {
     'placeholder-aemeath': [
-      {
-        sender: 'placeholder-aemeath',
-        text: 'Hello! I am Aemeath. Ready to test the new roundness settings?',
-        time: '10:00 AM',
-        timestamp: Date.now() - 3600000,
-        files: []
-      },
-      {
-        sender: 'me',
-        text: 'This looks amazing! The blur and transparency are perfect.',
-        time: '10:05 AM',
-        timestamp: Date.now() - 3300000,
-        files: []
-      }
+      { sender: 'placeholder-aemeath', text: "Hey! Ready to run some stress tests on the UI?", time: "10:00 AM", timestamp: Date.now() - 3600000, files: [] },
+      { sender: 'me', text: "Always. What do you have in mind?", time: "10:01 AM", timestamp: Date.now() - 3540000, files: [] },
+      { sender: 'placeholder-aemeath', text: "I want to see how the glassmorphism holds up with a massive message history.", time: "10:02 AM", timestamp: Date.now() - 3480000, files: [] },
+      { sender: 'me', text: "The blur should be fine, but performance might dip if we don't virtualize.", time: "10:03 AM", timestamp: Date.now() - 3420000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Let's find out. I'm going to start sending a bunch of messages.", time: "10:04 AM", timestamp: Date.now() - 3360000, files: [] },
+      { sender: 'me', text: "Go for it.", time: "10:05 AM", timestamp: Date.now() - 3300000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 1 check", time: "10:06 AM", timestamp: Date.now() - 3240000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 2 check", time: "10:06 AM", timestamp: Date.now() - 3180000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 3 check", time: "10:07 AM", timestamp: Date.now() - 3120000, files: [] },
+      { sender: 'me', text: "Received first batch. Scroll is smooth so far.", time: "10:08 AM", timestamp: Date.now() - 3060000, files: [] },
+      { sender: 'placeholder-aemeath', text: "How about some longer text to test the bubble expansion?", time: "10:09 AM", timestamp: Date.now() - 3000000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam in dui mauris. Vivamus hendrerit arcu sed erat molestie vehicula. Sed auctor neque eu tellus rhoncus ut eleifend nibh porttitor.", time: "10:10 AM", timestamp: Date.now() - 2940000, files: [] },
+      { sender: 'me', text: "Bubble looks great. The padding is consistent.", time: "10:11 AM", timestamp: Date.now() - 2880000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Nice. Sending a few more quickly now.", time: "10:12 AM", timestamp: Date.now() - 2820000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Check 4", time: "10:12 AM", timestamp: Date.now() - 2760000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Check 5", time: "10:12 AM", timestamp: Date.now() - 2700000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Check 6", time: "10:12 AM", timestamp: Date.now() - 2640000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Check 7", time: "10:12 AM", timestamp: Date.now() - 2580000, files: [] },
+      { sender: 'me', text: "Rapid fire is working. No dropped frames.", time: "10:13 AM", timestamp: Date.now() - 2520000, files: [] },
+      { sender: 'placeholder-aemeath', text: "What about multi-line manual breaks?\nLine 1\nLine 2\nLine 3", time: "10:14 AM", timestamp: Date.now() - 2460000, files: [] },
+      { sender: 'me', text: "Handled perfectly.", time: "10:15 AM", timestamp: Date.now() - 2400000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Great. Let's keep going. We need at least 40 for a good test.", time: "10:16 AM", timestamp: Date.now() - 2340000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 15...", time: "10:17 AM", timestamp: Date.now() - 2280000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 16...", time: "10:18 AM", timestamp: Date.now() - 2220000, files: [] },
+      { sender: 'me', text: "I'll contribute some too.", time: "10:19 AM", timestamp: Date.now() - 2160000, files: [] },
+      { sender: 'me', text: "This is a really long message history test.", time: "10:20 AM", timestamp: Date.now() - 2100000, files: [] },
+      { sender: 'me', text: "Testing the scroll to bottom behavior.", time: "10:21 AM", timestamp: Date.now() - 2040000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Does it auto-scroll when I send new ones?", time: "10:22 AM", timestamp: Date.now() - 1980000, files: [] },
+      { sender: 'me', text: "If I'm already at the bottom, it should.", time: "10:23 AM", timestamp: Date.now() - 1920000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Test scroll 1", time: "10:24 AM", timestamp: Date.now() - 1860000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Test scroll 2", time: "10:25 AM", timestamp: Date.now() - 1800000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Test scroll 3", time: "10:26 AM", timestamp: Date.now() - 1740000, files: [] },
+      { sender: 'me', text: "Yep, it's sticking to the bottom.", time: "10:27 AM", timestamp: Date.now() - 1680000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Fantastic. Almost there.", time: "10:28 AM", timestamp: Date.now() - 1620000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 30", time: "10:29 AM", timestamp: Date.now() - 1560000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 31", time: "10:30 AM", timestamp: Date.now() - 1500000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 32", time: "10:31 AM", timestamp: Date.now() - 1440000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 33", time: "10:32 AM", timestamp: Date.now() - 1380000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 34", time: "10:33 AM", timestamp: Date.now() - 1320000, files: [] },
+      { sender: 'me', text: "Still smooth as butter.", time: "10:34 AM", timestamp: Date.now() - 1260000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 36", time: "10:35 AM", timestamp: Date.now() - 1200000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 37", time: "10:36 AM", timestamp: Date.now() - 1140000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 38", time: "10:37 AM", timestamp: Date.now() - 1080000, files: [] },
+      { sender: 'placeholder-aemeath', text: "Message 39", time: "10:38 AM", timestamp: Date.now() - 1020000, files: [] },
+      { sender: 'placeholder-aemeath', text: "And Message 40! We made it.", time: "10:39 AM", timestamp: Date.now() - 960000, files: [] },
+      { sender: 'me', text: "Mission accomplished. The UI passed the test.", time: "10:40 AM", timestamp: Date.now() - 900000, files: [] }
     ],
     'placeholder-qiuyuan': [
       { sender: 'placeholder-qiuyuan', text: 'Hey! Ready to test the new file transfer speeds?', time: '09:00 AM', timestamp: Date.now() - 3600000 * 5, files: [] },
@@ -220,15 +253,18 @@ function appReducer(state, action) {
   }
 }
 
+
+
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const stateRef = useRef(state);
   stateRef.current = state;
-
   const getState = useCallback(() => stateRef.current, []);
+  
+  const online = useOnlineMode(dispatch, getState);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, getState }}>
+    <AppContext.Provider value={{ state, dispatch, getState, online }}>
       {children}
     </AppContext.Provider>
   );
