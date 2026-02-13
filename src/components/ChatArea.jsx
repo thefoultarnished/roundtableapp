@@ -232,6 +232,12 @@ export default function ChatArea() {
       onClick={() => {
         if (state.activeChatUserId) {
           dispatch({ type: 'CLEAR_UNREAD', payload: state.activeChatUserId });
+
+          // Send read receipts when chat area is clicked
+          if (online?.sendReadReceipts) {
+            console.log(`👁️ Chat clicked, sending read receipts for ${state.activeChatUserId}`);
+            online.sendReadReceipts(state.activeChatUserId);
+          }
         }
       }}
     >
