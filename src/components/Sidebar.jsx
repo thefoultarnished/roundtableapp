@@ -16,9 +16,18 @@ export default function Sidebar() {
     : state.displayedUsers;
 
   const handleUserClick = useCallback((userId) => {
+    console.log(`👤 User clicked: ${userId}`);
     dispatch({ type: 'SET_ACTIVE_CHAT', payload: userId });
     dispatch({ type: 'CLEAR_UNREAD', payload: userId });
-  }, [dispatch]);
+
+    // Request chat history from server
+    if (online?.requestChatHistory) {
+      console.log(`📜 Requesting history for ${userId}`);
+      online.requestChatHistory(userId);
+    } else {
+      console.warn('⚠️ requestChatHistory not available');
+    }
+  }, [dispatch, online]);
 
   const handleRefresh = useCallback(() => {
     if (state.globalInvokeFunc) {

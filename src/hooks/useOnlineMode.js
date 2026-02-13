@@ -264,6 +264,30 @@ export function useOnlineMode(dispatch, getState) {
         }
     }, [keyPair]);
 
+    const requestChatHistory = useCallback((targetUserId, limit = 50, offset = 0) => {
+        console.log(`🔍 requestChatHistory called with targetUserId: ${targetUserId}`);
+        console.log(`📡 WS Status: ${wsRef.current ? wsRef.current.readyState : 'null'} (OPEN=${WebSocket.OPEN})`);
+
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.warn('❌ Cannot request history: Not connected to server');
+            return;
+        }
+
+        const myUn = localStorage.getItem('username');
+        const myId = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser'
+            ? myUn
+            : String(localStorage.getItem('userId'));
+
+        console.log(`📜 Requesting chat history with ${targetUserId}... (myId: ${myId})`);
+        wsRef.current.send(JSON.stringify({
+            type: 'get_chat_history',
+            userId: myId,
+            otherUserId: String(targetUserId),
+            limit: limit,
+            offset: offset
+        }));
+    }, []);
+
     const handleServerMessage = async (data) => {
         const { type } = data;
 
@@ -271,9 +295,9 @@ export function useOnlineMode(dispatch, getState) {
             case 'user_connected': {
                 const newUser = data.user;
                 const myUn = localStorage.getItem('username');
-                const myIdOnConnect = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser' 
-                    ? myUn 
-                    : String(localStorage.getItem('userId')); 
+                const myIdOnConnect = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser'
+                    ? myUn
+                    : String(localStorage.getItem('userId'));
 
                 if (newUser && String(newUser.id) !== String(myIdOnConnect) && newUser.publicKey) {
                     try {
@@ -281,7 +305,7 @@ export function useOnlineMode(dispatch, getState) {
                         userPublicKeys.current[newUser.id] = importedKey;
                         savePeerKey(newUser.id, newUser.publicKey);
                         // console.log(`📡 Captured Public Key for new user: ${newUser.id}`);
-                        
+
                         // Add to Sidebar/Context
                         const numId = parseInt(newUser.id, 10);
                         const sId = isNaN(numId) ? newUser.id : numId;
@@ -293,9 +317,9 @@ export function useOnlineMode(dispatch, getState) {
                                 sessionId: newUser.sessionId, // IMPORTANT: Used for client-side dedupe
                                 name: newUser.info.name || 'Unknown User',
                                 username: newUser.info.username || 'unknown',
-                                profile_picture: newUser.info.profilePicture, 
+                                profile_picture: newUser.info.profilePicture,
                                 status: 'online',
-                                avatarGradient: 'from-blue-500 to-purple-500' 
+                                avatarGradient: 'from-blue-500 to-purple-500'
                             }
                         });
 
@@ -310,12 +334,12 @@ export function useOnlineMode(dispatch, getState) {
             case 'user_list': {
                 // Filter out self
                 const myUnList = localStorage.getItem('username');
-                const myIdList = myUnList && myUnList !== 'Anonymous' && myUnList !== 'RoundtableUser' 
-                    ? myUnList 
-                    : String(localStorage.getItem('userId')); 
-                
+                const myIdList = myUnList && myUnList !== 'Anonymous' && myUnList !== 'RoundtableUser'
+                    ? myUnList
+                    : String(localStorage.getItem('userId'));
+
                 const others = data.users.filter(u => String(u.id) !== String(myIdList));
-                
+
                 // Import and Store their public keys (Async)
                 await Promise.all(others.map(async (u) => {
                     if (u.publicKey) {
@@ -339,14 +363,105 @@ export function useOnlineMode(dispatch, getState) {
                         sessionId: u.sessionId, // IMPORTANT
                         name: u.info.name || 'Unknown User',
                         username: u.info.username || 'unknown',
-                        profile_picture: u.info.profilePicture, 
+                        profile_picture: u.info.profilePicture,
                         status: 'online',
-                        avatarGradient: 'from-blue-500 to-purple-500' 
+                        avatarGradient: 'from-blue-500 to-purple-500'
                     };
                 });
 
                 dispatch({ type: 'SET_USERS', payload: userListForContext });
                 console.log(`📡 Synced ${userListForContext.length} users from relay`);
+                break;
+            }
+
+            case 'chat_history': {
+                console.log('🎉 Received chat_history response from server!', data);
+                const { userId, messages, senderPublicKey } = data;
+                const numericUserId = parseInt(userId, 10);
+                const safeUserId = isNaN(numericUserId) ? userId : numericUserId;
+
+                console.log(`📜 Received ${messages.length} messages from history for user ${safeUserId}`);
+
+                // Decrypt messages asynchronously
+                (async () => {
+                    // Import sender's public key if provided
+                    let senderKey = userPublicKeys.current[String(userId)];
+                    if (!senderKey && senderPublicKey && keyPair) {
+                        try {
+                            senderKey = await importPublicKey(senderPublicKey);
+                            userPublicKeys.current[String(userId)] = senderKey;
+                            savePeerKey(String(userId), senderPublicKey);
+                            console.log(`✅ Imported public key for sender ${userId} from history`);
+                        } catch (e) {
+                            console.error(`Failed to import public key for ${userId}:`, e);
+                        }
+                    }
+
+                    const formattedMessages = await Promise.all(messages.map(async (msg) => {
+                        let decryptedText = '';
+                        const myUn = localStorage.getItem('username');
+                        const myId = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser'
+                            ? myUn
+                            : String(localStorage.getItem('userId'));
+
+                        // Check if sender is me
+                        const isFromMe = msg.senderId === myId || msg.senderId === localStorage.getItem('userId');
+
+                        try {
+                            // Decrypt if encrypted
+                            if (msg.content.encrypted && msg.content.iv && msg.content.cipher) {
+                                const safeSenderId = String(msg.senderId);
+                                let sharedKey = sharedKeys.current[safeSenderId];
+
+                                // Try to derive key if missing
+                                if (!sharedKey && senderKey && keyPair) {
+                                    console.log(`Deriving shared key for sender ${safeSenderId} from history...`);
+                                    sharedKey = await deriveSharedKey(keyPair.privateKey, senderKey);
+                                    sharedKeys.current[safeSenderId] = sharedKey;
+                                }
+
+                                if (sharedKey) {
+                                    try {
+                                        decryptedText = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
+                                    } catch (decErr) {
+                                        console.error("Decryption error in history:", decErr);
+                                        decryptedText = "⚠️ Decryption Error";
+                                    }
+                                } else {
+                                    decryptedText = "🔒 Encrypted Message (Missing Key)";
+                                    console.warn(`Missing shared key for ${safeSenderId} in history`);
+                                }
+                            } else {
+                                // Plaintext message
+                                decryptedText = msg.content.text || '';
+                            }
+                        } catch (e) {
+                            console.error('Error processing history message:', e);
+                            decryptedText = '⚠️ Error';
+                        }
+
+                        return {
+                            sender: isFromMe ? 'me' : msg.senderId,
+                            text: decryptedText,
+                            time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            timestamp: msg.timestamp,
+                            files: [],
+                            delivered: msg.delivered,
+                            read: msg.read
+                        };
+                    }));
+
+                    console.log('Formatted messages:', formattedMessages);
+
+                    // Set messages for this user
+                    dispatch({
+                        type: 'SET_MESSAGES',
+                        payload: {
+                            ...getState().messages,
+                            [safeUserId]: formattedMessages
+                        }
+                    });
+                })();
                 break;
             }
 
@@ -523,5 +638,26 @@ export function useOnlineMode(dispatch, getState) {
         }
     }, [dispatch, keyPair]);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity }), [connect, sendMessageOnline, isOnline, broadcastIdentity]);
+    // Request chat history when active chat changes
+    useEffect(() => {
+        console.log('🔄 useEffect triggered: Checking active chat user...');
+        const activeUserId = getState().activeChatUserId;
+        console.log(`📌 Active Chat User ID: ${activeUserId}`);
+        console.log(`📡 WS Open: ${wsRef.current?.readyState === WebSocket.OPEN}`);
+
+        if (activeUserId && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            console.log(`✅ Conditions met, requesting history for ${activeUserId}`);
+            // Small delay to ensure connection is fully ready
+            const timeout = setTimeout(() => {
+                requestChatHistory(activeUserId);
+            }, 100);
+            return () => clearTimeout(timeout);
+        } else {
+            if (!activeUserId) console.warn('⚠️ No active chat user');
+            if (!wsRef.current) console.warn('⚠️ No websocket connection');
+            if (wsRef.current && wsRef.current.readyState !== WebSocket.OPEN) console.warn(`⚠️ WS not open, state: ${wsRef.current.readyState}`);
+        }
+    }, [getState, requestChatHistory]);
+
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory]);
 }
