@@ -9,6 +9,8 @@ import SummaryModal from './components/SummaryModal';
 import NotificationContainer from './components/NotificationContainer';
 import { useTauriIntegration } from './hooks/useTauriIntegration';
 import { useTheme } from './hooks/useTheme';
+import { useTaskbarBadge } from './hooks/useTaskbarBadge';
+import './utils/taskbarBadgeTest'; // Load test function
 
 function AuroraBackground() {
   return (
@@ -25,6 +27,7 @@ function AppContent() {
   const [saveStatus, setSaveStatus] = React.useState('');
   useTauriIntegration();
   useTheme();
+  useTaskbarBadge(state.unreadCounts); // Update Windows taskbar badge
   
   const updateBackground = () => {
     const savedTheme = localStorage.getItem('theme') || 'aurora';
