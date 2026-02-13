@@ -227,7 +227,14 @@ export default function ChatArea() {
 
   // ===== Active Chat =====
   return (
-    <main className="glass-panel flex-1 h-full flex flex-col rounded-2xl z-10 min-w-[400px] overflow-hidden relative">
+    <main 
+      className="glass-panel flex-1 h-full flex flex-col rounded-2xl z-10 min-w-[400px] overflow-hidden relative"
+      onClick={() => {
+        if (state.activeChatUserId) {
+          dispatch({ type: 'CLEAR_UNREAD', payload: state.activeChatUserId });
+        }
+      }}
+    >
       {/* Ambient background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-cyan-500/5 to-teal-500/5 blur-3xl" />

@@ -140,8 +140,8 @@ export default function Sidebar() {
       </div>
 
       {/* User list */}
-      <div id="user-list" className="flex-grow overflow-y-auto px-2 py-1">
-        {filteredUsers.length === 0 && (
+      <div id="user-list" className="flex-grow overflow-y-auto px-2 py-1 space-y-4">
+        {state.allUsers.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-200/50 to-slate-300/30 dark:from-slate-700/30 dark:to-slate-800/20 flex items-center justify-center mb-4 backdrop-blur-sm animate-pulse">
               <svg className="w-8 h-8 text-slate-400/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -152,16 +152,74 @@ export default function Sidebar() {
             <p className="text-xs text-slate-400/60 mt-1">Waiting for peers on the network...</p>
           </div>
         )}
-        {filteredUsers.map((user, index) => (
-          <UserItem
-            key={user.id}
-            user={user}
-            index={index}
-            isActive={user.id === state.activeChatUserId}
-            unreadCount={state.unreadCounts[user.id] || 0}
-            onClick={() => handleUserClick(user.id)}
-          />
-        ))}
+
+        {/* Online Section */}
+        {(() => {
+          const onlineUsers = state.allUsers
+            .filter(u => u.status === 'online')
+            .filter(u => !searchQuery || u.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort((a, b) => {
+              const lastA = state.messages[a.id]?.at(-1)?.timestamp || 0;
+              const lastB = state.messages[b.id]?.at(-1)?.timestamp || 0;
+              return lastB - lastA;
+            });
+
+          if (onlineUsers.length === 0) return null;
+
+          return (
+            <div className="space-y-1">
+              <div className="px-3 py-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
+                <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Online</h3>
+                <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{onlineUsers.length}</span>
+              </div>
+              {onlineUsers.map((user, index) => (
+                <UserItem
+                  key={user.id}
+                  user={user}
+                  index={index}
+                  isActive={user.id === state.activeChatUserId}
+                  unreadCount={state.unreadCounts[user.id] || 0}
+                  onClick={() => handleUserClick(user.id)}
+                />
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Offline Section */}
+        {(() => {
+          const offlineUsers = state.allUsers
+            .filter(u => u.status !== 'online')
+            .filter(u => !searchQuery || u.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .sort((a, b) => {
+              const lastA = state.messages[a.id]?.at(-1)?.timestamp || 0;
+              const lastB = state.messages[b.id]?.at(-1)?.timestamp || 0;
+              return lastB - lastA;
+            });
+
+          if (offlineUsers.length === 0) return null;
+
+          return (
+            <div className="space-y-1">
+              <div className="px-3 py-1 flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-600"></span>
+                <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Offline</h3>
+                <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{offlineUsers.length}</span>
+              </div>
+              {offlineUsers.map((user, index) => (
+                <UserItem
+                  key={user.id}
+                  user={user}
+                  index={index}
+                  isActive={user.id === state.activeChatUserId}
+                  unreadCount={state.unreadCounts[user.id] || 0}
+                  onClick={() => handleUserClick(user.id)}
+                />
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Profile footer — Glass card */}

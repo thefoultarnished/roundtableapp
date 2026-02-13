@@ -9,6 +9,7 @@ export function useOnlineMode(dispatch, getState) {
     const [ws, setWs] = useState(null);
     const [keyPair, setKeyPair] = useState(null);
     const [isOnline, setIsOnline] = useState(false);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     // Store shared keys: { [userId]: CryptoKey }
     const sharedKeys = useRef({}); 
@@ -33,7 +34,7 @@ export function useOnlineMode(dispatch, getState) {
             socket.onopen = () => {
                 console.log('Connected to Relay Server');
                 setIsOnline(true);
-                setWs(socket); // Trigger re-render to run the identification effect
+                setWs(socket); 
             };
 
             socket.onmessage = async (event) => {
@@ -56,6 +57,12 @@ export function useOnlineMode(dispatch, getState) {
                     setIsOnline(false);
                     setWs(null);
                     wsRef.current = null;
+                    
+                    // Mark everyone as offline since we lost relay sync
+                    const currentUsers = getState().allUsers;
+                    currentUsers.forEach(u => {
+                        dispatch({ type: 'UPDATE_USER_STATUS', payload: { userId: u.id, status: 'offline' } });
+                    });
                 }
             };
         } catch (err) {
@@ -108,26 +115,28 @@ export function useOnlineMode(dispatch, getState) {
                 } catch (e) { console.error("Failed to parse cached peer keys"); }
             }
 
-            // Initial Connection Check
-            checkConnection();
+            setIsInitialized(true);
+            checkConnection(true); // Pass true to indicate keys are ready
         }
 
-        function checkConnection() {
+        function checkConnection(keysAreReady = false) {
             const mode = localStorage.getItem('connectionMode') || 'online';
             const url = localStorage.getItem('relayServerUrl');
+            
             if (mode === 'online' && url) {
-                // Guard: Prevent redundant connections
                 if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
-                    // Simple check to avoid loop
-                    console.log("Already connected/connecting. Skipping redundant connect.");
                     return;
                 }
-                console.log("Detecting Online Mode preference, connecting...");
+                
+                if (!keysAreReady && !keyPair) {
+                     console.log("⏳ Keys not yet ready, delaying connection...");
+                     return;
+                }
+
+                console.log("🚀 Keys ready, connecting to relay...");
                 connect(url);
             } else {
-                // If we switched to LAN or cleared URL, close socket
-                 if (wsRef.current) {
-                    console.log("Online Mode disabled, closing socket.");
+                if (wsRef.current) {
                     wsRef.current.close();
                 }
             }
@@ -206,6 +215,7 @@ export function useOnlineMode(dispatch, getState) {
     }, [ws, keyPair]);
 
     const handleServerMessage = async (data) => {
+        if (!isInitialized) return;
         const { type } = data;
 
         switch (type) {
@@ -222,6 +232,23 @@ export function useOnlineMode(dispatch, getState) {
                         userPublicKeys.current[newUser.id] = importedKey;
                         savePeerKey(newUser.id, newUser.publicKey);
                         console.log(`📡 Captured Public Key for new user: ${newUser.id}`);
+                        
+                        // Add to Sidebar/Context
+                        const numId = parseInt(newUser.id, 10);
+                        const sId = isNaN(numId) ? newUser.id : numId;
+                        console.log(`👤 Adding user to sidebar: ${sId} (${newUser.info.name})`);
+                        dispatch({
+                            type: 'ADD_USER',
+                            payload: {
+                                id: sId,
+                                name: newUser.info.name || 'Unknown User',
+                                username: newUser.info.username || 'unknown',
+                                profile_picture: newUser.info.profilePicture, 
+                                status: 'online',
+                                avatarGradient: 'from-blue-500 to-purple-500' 
+                            }
+                        });
+
                         processQueue(newUser.id);
                     } catch (e) {
                         console.error(`❌ CRITICAL: Failed to import key for ${newUser.id}`, e);
@@ -270,6 +297,7 @@ export function useOnlineMode(dispatch, getState) {
                             avatarGradient: 'from-blue-500 to-purple-500' 
                         }
                     });
+                    console.log(`👤 Discovered user from list: ${safeId}`);
                 });
                 break;
             }
