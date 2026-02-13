@@ -27,7 +27,7 @@ function AppContent() {
   useTheme();
   
   const updateBackground = () => {
-    const savedTheme = localStorage.getItem('theme') || 'light';
+    const savedTheme = localStorage.getItem('theme') || 'aurora';
     const isTransparent = localStorage.getItem('windowTransparency') !== 'false';
     const winOpacity = parseFloat(localStorage.getItem('windowOpacity') || '0.70');
     

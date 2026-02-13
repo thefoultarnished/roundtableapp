@@ -2,7 +2,8 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 // Import crypto functions (created in previous step)
 // Note: We might need to ensure correct relative path import
 // Assuming src/utils/crypto.js exists
-import { generateKeyPair, exportKey, importPrivateKey, deriveSharedKey, encryptMessage, decryptMessage } from '../utils/crypto';
+import { isWindowFocused } from '../utils';
+import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage } from '../utils/crypto';
 
 export function useOnlineMode(dispatch, getState) {
     const [ws, setWs] = useState(null);
@@ -15,6 +16,7 @@ export function useOnlineMode(dispatch, getState) {
     const userPublicKeys = useRef({});
 
     const wsRef = useRef(null);
+    const pendingMessages = useRef([]); // [{targetId, text}]
 
     // Connect to WebSocket Server (Moved to avoid TDZ)
     const connect = useCallback((serverUrl) => {
@@ -70,12 +72,40 @@ export function useOnlineMode(dispatch, getState) {
             const storedPriv = localStorage.getItem('privKey');
             const storedPub = localStorage.getItem('pubKey');
             let keys;
-            if (storedPriv && storedPub) {
+
+            try {
+                if (storedPriv && storedPub) {
+                    const privateKey = await importPrivateKey(JSON.parse(storedPriv));
+                    const publicKey = await importPublicKey(JSON.parse(storedPub));
+                    keys = { privateKey, publicKey };
+                    console.log("Loaded E2EE Keys from Storage");
+                } else {
+                    throw new Error("Keys missing");
+                }
+            } catch (e) {
+                console.log("Generating new E2EE Key Pair...");
                 keys = await generateKeyPair();
-                setKeyPair(keys);
-            } else {
-                keys = await generateKeyPair();
-                setKeyPair(keys);
+                const privJwk = await exportKey(keys.privateKey);
+                const pubJwk = await exportKey(keys.publicKey);
+                localStorage.setItem('privKey', JSON.stringify(privJwk));
+                localStorage.setItem('pubKey', JSON.stringify(pubJwk));
+            }
+            
+            setKeyPair(keys);
+
+            // Load cached peer keys
+            const cachedKeys = localStorage.getItem('peerPublicKeys');
+            if (cachedKeys) {
+                try {
+                    const parsed = JSON.parse(cachedKeys);
+                    await Promise.all(Object.entries(parsed).map(async ([id, jwk]) => {
+                        try {
+                            const imported = await importPublicKey(jwk);
+                            userPublicKeys.current[id] = imported;
+                        } catch (e) { console.error(`Failed to import cached key for ${id}`); }
+                    }));
+                    console.log(`📂 Loaded ${Object.keys(userPublicKeys.current).length} peer keys from cache`);
+                } catch (e) { console.error("Failed to parse cached peer keys"); }
             }
 
             // Initial Connection Check
@@ -83,7 +113,7 @@ export function useOnlineMode(dispatch, getState) {
         }
 
         function checkConnection() {
-            const mode = localStorage.getItem('connectionMode');
+            const mode = localStorage.getItem('connectionMode') || 'online';
             const url = localStorage.getItem('relayServerUrl');
             if (mode === 'online' && url) {
                 // Guard: Prevent redundant connections
@@ -128,7 +158,7 @@ export function useOnlineMode(dispatch, getState) {
     // Heartbeat / Auto-Reconnect
     useEffect(() => {
         const interval = setInterval(() => {
-            const mode = localStorage.getItem('connectionMode');
+            const mode = localStorage.getItem('connectionMode') || 'online';
             const url = localStorage.getItem('relayServerUrl');
             if (mode === 'online' && url) {
                 if (!wsRef.current || wsRef.current.readyState === WebSocket.CLOSED) {
@@ -148,16 +178,17 @@ export function useOnlineMode(dispatch, getState) {
     useEffect(() => {
         if (ws && ws.readyState === WebSocket.OPEN && keyPair) {
              const identify = async () => {
-                // Use getSafeUserId to ensure we use the same ID logic as the rest of the app
-                const myId = String(localStorage.getItem('userId')); 
-                const pubKeyJwk = await exportKey(keyPair.publicKey);
+                // Use Username as the primary unique ID if available, fallback to random userId
+                const myUsername = localStorage.getItem('username');
+                const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser' 
+                    ? myUsername 
+                    : String(localStorage.getItem('userId')); 
                 
-                // Fallbacks for missing profile info
-                const name = localStorage.getItem('displayName') || `User ${myId.substr(0, 4)}`;
-                const username = localStorage.getItem('username') || `user_${myId}`;
+                const pubKeyJwk = await exportKey(keyPair.publicKey);
+                const name = localStorage.getItem('displayName') || myId;
                 const profilePicture = localStorage.getItem('profilePicture') || null;
 
-                console.log("Sending Identity to Relay:", { name, myId });
+                console.log(`🔑 Identifying as [${myId}] and sharing Public Key`);
 
                 ws.send(JSON.stringify({
                     type: 'identify',
@@ -165,7 +196,7 @@ export function useOnlineMode(dispatch, getState) {
                     publicKey: pubKeyJwk,
                     info: {
                         name: name,
-                        username: username,
+                        username: myId,
                         profilePicture: profilePicture
                     }
                 }));
@@ -178,20 +209,49 @@ export function useOnlineMode(dispatch, getState) {
         const { type } = data;
 
         switch (type) {
-            case 'user_list':
-                // Update active users
-                // Filter out self
-                const myId = String(localStorage.getItem('userId'));
-                
-                // Ensure we compare strings to strings for ID check
-                const others = data.users.filter(u => String(u.id) !== myId);
-                
-                // Store their public keys
-                others.forEach(u => {
-                    if (u.publicKey) {
-                        userPublicKeys.current[u.id] = u.publicKey;
+            case 'user_connected': {
+                const newUser = data.user;
+                const myUn = localStorage.getItem('username');
+                const myIdOnConnect = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser' 
+                    ? myUn 
+                    : String(localStorage.getItem('userId')); 
+
+                if (newUser && String(newUser.id) !== String(myIdOnConnect) && newUser.publicKey) {
+                    try {
+                        const importedKey = await importPublicKey(newUser.publicKey);
+                        userPublicKeys.current[newUser.id] = importedKey;
+                        savePeerKey(newUser.id, newUser.publicKey);
+                        console.log(`📡 Captured Public Key for new user: ${newUser.id}`);
+                        processQueue(newUser.id);
+                    } catch (e) {
+                        console.error(`❌ CRITICAL: Failed to import key for ${newUser.id}`, e);
                     }
-                });
+                }
+                break;
+            }
+
+            case 'user_list': {
+                // Filter out self
+                const myUnList = localStorage.getItem('username');
+                const myIdList = myUnList && myUnList !== 'Anonymous' && myUnList !== 'RoundtableUser' 
+                    ? myUnList 
+                    : String(localStorage.getItem('userId')); 
+                
+                const others = data.users.filter(u => String(u.id) !== String(myIdList));
+                
+                // Import and Store their public keys (Async)
+                await Promise.all(others.map(async (u) => {
+                    if (u.publicKey) {
+                        try {
+                            const importedKey = await importPublicKey(u.publicKey);
+                            userPublicKeys.current[u.id] = importedKey;
+                            savePeerKey(u.id, u.publicKey);
+                            processQueue(u.id);
+                        } catch (e) {
+                            console.error(`❌ CRITICAL: Failed to import public key for ${u.id}`, e);
+                        }
+                    }
+                }));
 
                 // Update App Context (Add/Update Users)
                 others.forEach(u => {
@@ -212,126 +272,178 @@ export function useOnlineMode(dispatch, getState) {
                     });
                 });
                 break;
+            }
 
             case 'message':
                 console.log("Received Online Message:", data);
                 const { senderId, payload } = data; 
                 
                 try {
-                // Auto-add user if not in list (Self-Healing)
-                const numericSenderId = parseInt(senderId, 10);
-                const safeSenderId = isNaN(numericSenderId) ? senderId : numericSenderId;
+                    let finalText = "";
 
-                // Check if we know this user
-                // We access the current state via getState() which is available in the closure? No, we need it.
-                const currentUserList = getState().allUsers;
-                const senderExists = currentUserList.find(u => u.id === safeSenderId);
-                
-                if (!senderExists) {
+                    // Decrypt if encrypted
+                    if (payload.encrypted && payload.iv && payload.cipher) {
+                        const safeSenderId = String(senderId);
+                        let sharedKey = sharedKeys.current[safeSenderId];
+                        
+                        // Try to derive key if missing
+                        if (!sharedKey && userPublicKeys.current[safeSenderId] && keyPair) {
+                             console.log(`Deriving shared key for sender ${safeSenderId}...`);
+                             sharedKey = await deriveSharedKey(keyPair.privateKey, userPublicKeys.current[safeSenderId]);
+                             sharedKeys.current[safeSenderId] = sharedKey;
+                        }
+
+                        if (sharedKey) {
+                            try {
+                                finalText = await decryptMessage(payload.iv, payload.cipher, sharedKey);
+                            } catch (decErr) {
+                                console.error("Decryption low-level error:", decErr);
+                                finalText = "⚠️ Decryption Error";
+                            }
+                        } else {
+                            finalText = "🔒 Encrypted Message (Missing Key)";
+                            console.warn(`Missing shared key for ${safeSenderId}. Has PubKey: ${!!userPublicKeys.current[safeSenderId]}`);
+                        }
+                    } else {
+                        // Plaintext fallback
+                        finalText = payload.text || "";
+                    }
+
+                    // Auto-add user if not in list (Self-Healing)
+                    const numericSenderId = parseInt(senderId, 10);
+                    const safeSenderId = isNaN(numericSenderId) ? senderId : numericSenderId;
+
+                    // Check if we know this user
+                    const currentUserList = getState().allUsers;
+                    const senderExists = currentUserList.find(u => u.id === safeSenderId);
+                    
+                    if (!senderExists) {
+                        dispatch({
+                            type: 'ADD_USER',
+                            payload: {
+                                id: safeSenderId,
+                                name: `User ${safeSenderId}`,
+                                username: 'unknown',
+                                status: 'online',
+                                avatarGradient: 'from-gray-500 to-slate-500'
+                            }
+                        });
+                    }
+
                     dispatch({
-                        type: 'ADD_USER',
+                        type: 'ADD_MESSAGE',
                         payload: {
-                            id: safeSenderId,
-                            name: `User ${safeSenderId}`,
-                            username: 'unknown',
-                            status: 'online',
-                            avatarGradient: 'from-gray-500 to-slate-500'
+                            userId: safeSenderId,
+                            message: {
+                                sender: safeSenderId,
+                                text: finalText, 
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                timestamp: Date.now()
+                            }
                         }
                     });
-                }
 
-                dispatch({
-                    type: 'ADD_MESSAGE',
-                    payload: {
-                        userId: safeSenderId,
-                        message: {
-                            sender: safeSenderId,
-                            text: payload.text, 
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            timestamp: Date.now()
-                        }
+                    // Check unread count logic
+                    const currentActive = getState().activeChatUserId;
+                    const windowFocused = await isWindowFocused();
+
+                    if (currentActive !== safeSenderId || !windowFocused) {
+                        dispatch({
+                            type: 'INCREMENT_UNREAD',
+                            payload: safeSenderId
+                        });
                     }
-                });
 
                 } catch (e) {
-                    console.error('Decryption failed', e);
+                    console.error('Message handling failed', e);
                 }
                 break;
         }
     };
 
-    const sendMessageOnline = useCallback((targetId, text) => {
+    const savePeerKey = (id, jwk) => {
+        try {
+            const cached = JSON.parse(localStorage.getItem('peerPublicKeys') || '{}');
+            cached[id] = jwk;
+            localStorage.setItem('peerPublicKeys', JSON.stringify(cached));
+        } catch (e) { console.error("Failed to cache peer key", e); }
+    };
+
+    const processQueue = (targetId) => {
+        const remaining = [];
+        pendingMessages.current.forEach(msg => {
+            if (msg.targetId === targetId) {
+                console.log(`✉️ Retrying queued message for ${targetId}...`);
+                sendMessageOnline(msg.targetId, msg.text);
+            } else {
+                remaining.push(msg);
+            }
+        });
+        pendingMessages.current = remaining;
+    };
+
+    const sendMessageOnline = useCallback(async (targetId, text) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-            console.error('Not connected to online server. Attempting to reconnect...', {
-                wsExists: !!wsRef.current,
-                readyState: wsRef.current ? wsRef.current.readyState : 'N/A',
-                url: localStorage.getItem('relayServerUrl')
-            });
-            
-            // Try to reconnect immediately
-            const url = localStorage.getItem('relayServerUrl');
-            if (url) connect(url);
-            
+            console.warn('❌ Cannot send: Not connected. Queuing message.');
+            pendingMessages.current.push({ targetId, text });
             return;
         }
 
         const safeTargetId = String(targetId);
-        console.log(`Sending online message to ${safeTargetId}: ${text}`);
+        let payload = null;
 
-        wsRef.current.send(JSON.stringify({
-            type: 'message',
-            targetId: safeTargetId,
-            payload: { text } 
-        }));
-
-        // OPTIMISTIC UPDATE REMOVED FOR DEBUGGING DUPLICATES
-        // Use standard consistent ID for local display if we were to re-enable
-        /*
-        dispatch({
-            type: 'ADD_MESSAGE',
-            payload: {
-                userId: isNaN(parseInt(safeTargetId)) ? safeTargetId : parseInt(safeTargetId),
-                message: {
-                    sender: 'me',
-                    text: text,
-                    time: new Date().toLocaleTimeString(),
-                    timestamp: Date.now()
+        try {
+            const peerKey = userPublicKeys.current[safeTargetId];
+            if (peerKey && keyPair) {
+                let sharedKey = sharedKeys.current[safeTargetId];
+                if (!sharedKey) {
+                    sharedKey = await deriveSharedKey(keyPair.privateKey, peerKey);
+                    sharedKeys.current[safeTargetId] = sharedKey;
                 }
-            }
-        });
-        */
-        // Temporarily, we will rely on the server confirming/echoing or just seeing if the duplicate disappears.
-        // Wait, if I remove this, and server doesn't echo, I won't see my own message.
-        // But the user says "2 messages are shown". 
-        // So I WILL remove this to see if "1 message" remains (meaning we are getting an echo or alternate path)
-        // OR if 0 remain.
-        
-        // Re-adding with a twist: Only add if we don't think it's an echo.
-        // Actually, let's keep it removed. If the user complains "I don't see my message", we know the duplicate was just this + nothing.
-        // If they see 1 message, then something else is adding it.
-        
-        // To be safe and give immediate feedback: I will restore it but ensure the ID is strictly a Number if possible to match the reducer's key.
-        
-        const numericTargetId = parseInt(safeTargetId, 10);
-        const finalTargetId = isNaN(numericTargetId) ? safeTargetId : numericTargetId;
-
-        // Optimistic UI Update removed to prevent duplicates as ChatArea handles it
-        /*
-        dispatch({
-            type: 'ADD_MESSAGE',
-            payload: {
-                userId: finalTargetId,
-                message: {
-                    sender: 'me',
-                    text: text,
-                    time: new Date().toLocaleTimeString(),
-                    timestamp: Date.now()
+                
+                if (sharedKey) {
+                    const encrypted = await encryptMessage(text, sharedKey);
+                    payload = { 
+                        iv: encrypted.iv, 
+                        cipher: encrypted.cipher, 
+                        encrypted: true,
+                        text: "🔒 Encrypted Message" 
+                    };
                 }
+            } else {
+                console.warn(`🔐 Key missing for ${safeTargetId}. Queuing message until key arrives...`);
+                pendingMessages.current.push({ targetId, text });
+                return;
             }
-        });
-        */
+        } catch (e) {
+            console.error("❌ E2EE Encryption Failed Loudly:", e);
+            return; // Don't send plaintext
+        }
 
-    }, [dispatch]);
+        if (payload) {
+            wsRef.current.send(JSON.stringify({
+                type: 'message',
+                targetId: safeTargetId,
+                payload: payload
+            }));
+            
+            const numericTargetId = parseInt(safeTargetId, 10);
+            const finalTargetId = isNaN(numericTargetId) ? safeTargetId : numericTargetId;
+
+            dispatch({
+                type: 'ADD_MESSAGE',
+                payload: {
+                    userId: finalTargetId,
+                    message: {
+                        sender: 'me',
+                        text: text,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: Date.now()
+                    }
+                }
+            });
+        }
+    }, [dispatch, keyPair]);
 
     return useMemo(() => ({ connect, sendMessageOnline, isOnline }), [connect, sendMessageOnline, isOnline]);
 }

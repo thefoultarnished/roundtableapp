@@ -59,6 +59,7 @@ const initialState = {
     ]
   },
   allUsers: [
+    /*
     {
       id: 'placeholder-aemeath',
       name: 'Aemeath',
@@ -89,8 +90,10 @@ const initialState = {
       avatarGradient: 'from-purple-400 to-violet-500',
       profile_picture: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80'
     }
+    */
   ],
   displayedUsers: [
+    /*
     {
       id: 'placeholder-aemeath',
       name: 'Aemeath',
@@ -121,6 +124,7 @@ const initialState = {
       avatarGradient: 'from-purple-400 to-violet-500',
       profile_picture: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80'
     }
+    */
   ],
   discoveredUsers: [],
   activeChatUserId: null,

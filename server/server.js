@@ -91,6 +91,22 @@ function handleIdentify(ws, data) {
 
     // Update everyone else
     broadcastUserList();
+
+    // Explicitly notify others about the new user join (with their key)
+    const joinMessage = JSON.stringify({
+        type: 'user_connected',
+        user: {
+            id: userId,
+            publicKey: publicKey,
+            info: info || {}
+        }
+    });
+
+    for (const [otherId, otherUser] of connectedUsers.entries()) {
+        if (otherId !== userId && otherUser.socket.readyState === WebSocket.OPEN) {
+            otherUser.socket.send(joinMessage);
+        }
+    }
 }
 
 // Route Encrypted Message

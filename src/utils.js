@@ -3,8 +3,8 @@
  */
 export async function isWindowFocused() {
     if (!window.__TAURI__ || !window.__TAURI__.window) {
-        console.warn("Tauri window API not available - assuming not focused");
-        return false;
+        // Fallback for browser environment
+        return document.hasFocus();
     }
 
     try {

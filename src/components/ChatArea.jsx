@@ -65,14 +65,20 @@ export default function ChatArea() {
 
     if (inputValue.trim()) {
       sent = true;
-      const newMessage = {
-        sender: 'me',
-        text: inputValue.trim(),
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        timestamp: Date.now(),
-        files: [],
-      };
-      dispatch({ type: 'ADD_MESSAGE', payload: { userId: state.activeChatUserId, message: newMessage } });
+      const isOnlineMode = localStorage.getItem('connectionMode') === 'online';
+      
+      // Only manually add if NOT in online mode (online mode handles its own optimistic update)
+      if (!isOnlineMode) {
+        const newMessage = {
+          sender: 'me',
+          text: inputValue.trim(),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: Date.now(),
+          files: [],
+        };
+        dispatch({ type: 'ADD_MESSAGE', payload: { userId: state.activeChatUserId, message: newMessage } });
+      }
+      
       sendMessage(inputValue.trim(), activeUser.ip, activeUser.port);
     }
 

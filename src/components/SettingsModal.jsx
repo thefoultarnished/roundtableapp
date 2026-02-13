@@ -29,7 +29,7 @@ export default function SettingsModal() {
       setAppFont(localStorage.getItem('appFont') || "'Inter', sans-serif");
       setChatFont(localStorage.getItem('chatFont') || "'Inter', sans-serif");
       setFontScale(parseInt(localStorage.getItem('fontSizeScale') || '100'));
-      setTheme(localStorage.getItem('theme') || 'light');
+      setTheme(localStorage.getItem('theme') || 'aurora');
       setProfilePicture(localStorage.getItem('profilePicture') || '');
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
@@ -339,7 +339,7 @@ function SectionHeader({ color, label }) {
 }
 
 function ConnectionModeToggle() {
-  const [mode, setMode] = useState(localStorage.getItem('connectionMode') || 'lan');
+  const [mode, setMode] = useState(localStorage.getItem('connectionMode') || 'online');
   const [serverUrl, setServerUrl] = useState(localStorage.getItem('relayServerUrl') || 'ws://129.154.231.157:8080');
 
   useEffect(() => {
