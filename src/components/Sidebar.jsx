@@ -27,6 +27,12 @@ export default function Sidebar() {
     } else {
       console.warn('⚠️ requestChatHistory not available');
     }
+
+    // Send read receipts for messages in this chat
+    if (online?.sendReadReceipts) {
+      console.log(`👁️ Sending read receipts for ${userId}`);
+      online.sendReadReceipts(userId);
+    }
   }, [dispatch, online]);
 
   const handleRefresh = useCallback(() => {

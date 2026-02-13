@@ -5,7 +5,7 @@ import { useNetwork } from '../hooks/useNetwork';
 import * as utils from '../utils';
 
 export default function ChatArea() {
-  const { state, dispatch } = useAppContext();
+  const { state, dispatch, online } = useAppContext();
   const { sendMessage, initiateFileOffer } = useNetwork();
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);

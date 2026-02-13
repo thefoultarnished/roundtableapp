@@ -288,6 +288,35 @@ export function useOnlineMode(dispatch, getState) {
         }));
     }, []);
 
+    const sendReadReceipts = useCallback((targetUserId) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.warn('❌ Cannot send read receipts: Not connected');
+            return;
+        }
+
+        console.log(`👁️ Sending read receipts for chat with ${targetUserId}`);
+        const currentMessages = getState().messages[targetUserId] || [];
+        console.log(`📨 Found ${currentMessages.length} total messages in chat`);
+
+        let sentCount = 0;
+        currentMessages.forEach((msg, idx) => {
+            console.log(`[${idx}] Message from ${msg.sender}, read=${msg.read}, messageId=${msg.messageId}, timestamp=${msg.timestamp}`);
+
+            // Send read receipt for ALL messages (not just unread ones, to ensure they're marked read)
+            if (msg.sender !== 'me') {
+                const readReceiptPayload = {
+                    type: 'message_read',
+                    messageId: msg.messageId
+                };
+                console.log(`👁️ Sending read receipt:`, readReceiptPayload);
+                wsRef.current.send(JSON.stringify(readReceiptPayload));
+                sentCount++;
+            }
+        });
+
+        console.log(`✅ Sent ${sentCount} read receipts`);
+    }, [getState]);
+
     const handleServerMessage = async (data) => {
         const { type } = data;
 
@@ -445,6 +474,7 @@ export function useOnlineMode(dispatch, getState) {
                             text: decryptedText,
                             time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                             timestamp: msg.timestamp,
+                            messageId: msg.messageId,
                             files: [],
                             delivered: msg.delivered,
                             read: msg.read
@@ -462,6 +492,68 @@ export function useOnlineMode(dispatch, getState) {
                         }
                     });
                 })();
+                break;
+            }
+
+            case 'message_delivery_confirmation': {
+                console.log('📬 Message delivered:', data);
+                const { messageId, recipientId } = data;
+
+                // Extract timestamp from messageId (format: sender-recipient-timestamp)
+                const parts = messageId.split('-');
+                const timestamp = parts[parts.length - 1]; // Last part is timestamp
+
+                console.log(`📬 Looking for message with timestamp ${timestamp} in chat ${recipientId}`);
+
+                // Update message state to mark as delivered
+                const currentMessages = getState().messages;
+                const updatedMessages = { ...currentMessages };
+
+                // Update the message in the specific user's chat
+                if (updatedMessages[recipientId]) {
+                  updatedMessages[recipientId] = updatedMessages[recipientId].map(msg => {
+                    // Match by timestamp (within 1 second) and sender='me'
+                    if (msg.sender === 'me' && Math.abs(msg.timestamp - parseInt(timestamp)) < 1000) {
+                      console.log(`✅ Updated message ${timestamp} to delivered`);
+                      return { ...msg, delivered: true, messageId: messageId };
+                    }
+                    return msg;
+                  });
+                }
+
+                dispatch({ type: 'SET_MESSAGES', payload: updatedMessages });
+                break;
+            }
+
+            case 'message_read_confirmation': {
+                console.log('👁️ Message read confirmation:', data);
+                const { messageId } = data;
+
+                // Extract sender and timestamp from messageId (format: sender-recipient-timestamp)
+                const parts = messageId.split('-');
+                const senderId = parts[0];
+                const timestamp = parts[parts.length - 1];
+
+                console.log(`👁️ Looking for MY message (${senderId}) with timestamp ${timestamp}`);
+
+                // Update message state to mark as read
+                const currentMessages = getState().messages;
+                const updatedMessages = { ...currentMessages };
+
+                // Update all MY messages (messages I sent that have been read)
+                for (const userId in updatedMessages) {
+                  updatedMessages[userId] = updatedMessages[userId].map(msg => {
+                    // Match by timestamp and sender='me' (my sent messages)
+                    if (msg.sender === 'me' && Math.abs(msg.timestamp - parseInt(timestamp)) < 1000) {
+                      console.log(`👁️ Updated MY message at ${timestamp} to read`);
+                      return { ...msg, read: true, delivered: true };
+                    }
+                    return msg;
+                  });
+                }
+
+                console.log(`👁️ After update:`, updatedMessages);
+                dispatch({ type: 'SET_MESSAGES', payload: updatedMessages });
                 break;
             }
 
@@ -527,9 +619,12 @@ export function useOnlineMode(dispatch, getState) {
                             userId: safeSenderId,
                             message: {
                                 sender: safeSenderId,
-                                text: finalText, 
+                                text: finalText,
                                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                timestamp: Date.now()
+                                timestamp: Date.now(),
+                                messageId: data.messageId,
+                                delivered: false,
+                                read: false
                             }
                         }
                     });
@@ -623,6 +718,7 @@ export function useOnlineMode(dispatch, getState) {
             const numericTargetId = parseInt(safeTargetId, 10);
             const finalTargetId = isNaN(numericTargetId) ? safeTargetId : numericTargetId;
 
+            const myMessageId = `${localStorage.getItem('username')}-${finalTargetId}-${Date.now()}`;
             dispatch({
                 type: 'ADD_MESSAGE',
                 payload: {
@@ -631,7 +727,10 @@ export function useOnlineMode(dispatch, getState) {
                         sender: 'me',
                         text: text,
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
+                        messageId: myMessageId,
+                        delivered: false,
+                        read: false
                     }
                 }
             });
@@ -659,5 +758,5 @@ export function useOnlineMode(dispatch, getState) {
         }
     }, [getState, requestChatHistory]);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory]);
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts]);
 }

@@ -216,6 +216,22 @@ function handleIdentify(ws, data) {
             queued: true, // Flag to indicate this was queued
           }),
         );
+
+        // Notify sender that message was delivered
+        const sender = connectedUsers.get(msg.sender_id);
+        if (sender && sender.socket.readyState === WebSocket.OPEN) {
+          console.log(
+            `📬 Sending delivery confirmation for message ${msg.message_id} to ${msg.sender_id}`,
+          );
+          sender.socket.send(
+            JSON.stringify({
+              type: "message_delivery_confirmation",
+              messageId: msg.message_id,
+              recipientId: userId,
+              delivered: true,
+            }),
+          );
+        }
       });
 
       // Mark messages as delivered
@@ -289,12 +305,13 @@ function handleRouteMessage(ws, data) {
       console.error("Failed to save delivered message:", err);
     }
 
-    // Send delivery confirmation to sender
+    // Send delivery confirmation to sender (message reached recipient)
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
-          type: "message_sent",
+          type: "message_delivery_confirmation",
           messageId: messageId,
+          recipientId: targetId,
           delivered: true,
         }),
       );
@@ -470,11 +487,43 @@ function handleMessageDelivered(data) {
 function handleMessageRead(data) {
   const { messageId } = data;
 
-  if (!messageId) return;
+  console.log(`📬 Received message_read for:`, messageId);
+
+  if (!messageId) {
+    console.warn("⚠️ No messageId in message_read event");
+    return;
+  }
 
   try {
     markMessageRead.run(messageId);
-    console.log(`👁️  Message ${messageId} marked as read`);
+    console.log(`👁️  Message ${messageId} marked as read in database`);
+
+    // Extract sender ID from messageId format: senderId-recipientId-timestamp
+    const parts = messageId.split('-');
+    console.log(`📝 MessageId parts:`, parts);
+
+    if (parts.length >= 2) {
+      const senderId = parts[0]; // The original sender
+      console.log(`🔍 Looking for sender: ${senderId}`);
+
+      const sender = connectedUsers.get(senderId);
+      console.log(`📡 Sender connected:`, !!sender);
+
+      // Send read confirmation to sender if they're online
+      if (sender && sender.socket.readyState === WebSocket.OPEN) {
+        console.log(`📤 Sending read confirmation to ${senderId}`);
+        sender.socket.send(
+          JSON.stringify({
+            type: "message_read_confirmation",
+            messageId: messageId,
+          }),
+        );
+      } else {
+        console.warn(`⚠️ Sender ${senderId} not connected or socket not open`);
+      }
+    } else {
+      console.warn(`⚠️ Invalid messageId format:`, messageId);
+    }
   } catch (err) {
     console.error("Failed to mark message as read:", err);
   }

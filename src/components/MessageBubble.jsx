@@ -7,6 +7,36 @@ export default function MessageBubble({ message }) {
   const isSentByMe = message.sender === 'me';
   const animClass = isSentByMe ? 'slide-in-right' : 'slide-in-left';
 
+  // Determine delivery status icon
+  const getStatusIcon = () => {
+    if (!isSentByMe) return null;
+
+    // Read (double tick blue)
+    if (message.read) {
+      return (
+        <span className="text-cyan-400 text-xs font-bold" title="Read">
+          ✓✓
+        </span>
+      );
+    }
+
+    // Delivered (single tick gray)
+    if (message.delivered) {
+      return (
+        <span className="text-slate-400 text-xs font-bold" title="Delivered">
+          ✓
+        </span>
+      );
+    }
+
+    // Offline (clock icon)
+    return (
+      <span className="text-slate-500 text-xs" title="Pending (recipient offline)">
+        🕐
+      </span>
+    );
+  };
+
   if (message.fileTransfer) {
     return <FileTransferBubble message={message} isSentByMe={isSentByMe} animClass={animClass} />;
   }
@@ -57,8 +87,9 @@ export default function MessageBubble({ message }) {
                 <span className="inline-block w-12 h-0"></span>
               </div>
             )}
-            <div className={`absolute bottom-1 right-3 text-[9px] font-mono leading-none ${timestampColor}`}>
-              {message.time}
+            <div className={`absolute bottom-1 right-3 text-[9px] font-mono leading-none ${timestampColor} flex items-center gap-1`}>
+              <span>{message.time}</span>
+              {getStatusIcon()}
             </div>
           </div>
         </div>
