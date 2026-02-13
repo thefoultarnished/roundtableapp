@@ -322,13 +322,14 @@ export default function ChatArea() {
         </header>
 
         {/* Messages container */}
-        <div 
+        <div
           ref={messagesContainerRef}
           onScroll={handleScroll}
-          className="flex-grow p-5 overflow-y-auto space-y-3 scroll-smooth"
+          className="flex-grow p-5 overflow-y-auto space-y-3 scroll-smooth custom-scrollbar"
           style={{
             scrollBehavior: 'smooth',
             scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(6, 182, 212, 0.4) transparent',
           }}
         >
           {groupedMessages.length === 0 ? (
@@ -363,7 +364,7 @@ export default function ChatArea() {
             </>
           )}
 
-          {/* CSS for message animations */}
+          {/* CSS for message animations & custom scrollbar */}
           <style>{`
             @keyframes slideIn {
               from {
@@ -375,23 +376,55 @@ export default function ChatArea() {
                 transform: translateY(0);
               }
             }
-            
-            div::-webkit-scrollbar {
-              width: 6px;
+
+            /* Custom scrollbar - only thumb, no track */
+            .custom-scrollbar::-webkit-scrollbar {
+              width: 8px;
             }
-            div::-webkit-scrollbar-track {
+
+            .custom-scrollbar::-webkit-scrollbar-track {
               background: transparent;
+              margin: 8px 0;
             }
-            div::-webkit-scrollbar-thumb {
-              background: var(--text-muted);
-              opacity: 0.5;
+
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: linear-gradient(180deg, rgba(34, 197, 230, 0.5) 0%, rgba(20, 184, 166, 0.5) 100%);
               border-radius: 10px;
               border: 2px solid transparent;
               background-clip: content-box;
+              transition: all 0.3s ease;
             }
-            div::-webkit-scrollbar-thumb:hover {
-              background: var(--accent-1);
-              box-shadow: 0 0 10px var(--accent-glow);
+
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: linear-gradient(180deg, rgba(34, 197, 230, 0.8) 0%, rgba(20, 184, 166, 0.8) 100%);
+              box-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
+              border: 1px solid rgba(6, 182, 212, 0.3);
+              background-clip: padding-box;
+            }
+
+            .custom-scrollbar::-webkit-scrollbar-thumb:active {
+              background: linear-gradient(180deg, rgba(34, 197, 230, 1) 0%, rgba(20, 184, 166, 1) 100%);
+              box-shadow: 0 0 16px rgba(6, 182, 212, 0.7);
+            }
+
+            /* Dark theme scrollbar */
+            .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: linear-gradient(180deg, rgba(34, 197, 230, 0.4) 0%, rgba(20, 184, 166, 0.4) 100%);
+            }
+
+            .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: linear-gradient(180deg, rgba(34, 197, 230, 0.7) 0%, rgba(20, 184, 166, 0.7) 100%);
+              box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+            }
+
+            /* Aurora theme scrollbar */
+            .aurora .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: linear-gradient(180deg, rgba(99, 102, 241, 0.4) 0%, rgba(34, 197, 230, 0.4) 100%);
+            }
+
+            .aurora .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: linear-gradient(180deg, rgba(99, 102, 241, 0.7) 0%, rgba(34, 197, 230, 0.7) 100%);
+              box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
             }
           `}</style>
         </div>
