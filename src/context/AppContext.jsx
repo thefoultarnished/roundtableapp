@@ -150,11 +150,23 @@ function appReducer(state, action) {
 
     case 'ADD_USER': {
       const user = action.payload;
-      const exists = state.allUsers.find(u => u.id === user.id);
-      if (exists) {
-        const updatedUsers = state.allUsers.map(u => u.id === user.id ? { ...u, ...user } : u);
+      
+      // We check if a user with this ID OR this SessionID already exists
+      const existsIndex = state.allUsers.findIndex(u => 
+        String(u.id) === String(user.id) || 
+        (user.sessionId && u.sessionId && u.sessionId === user.sessionId)
+      );
+
+      if (existsIndex !== -1) {
+        // User exists, just update their details
+        const updatedUsers = [...state.allUsers];
+        // If sessionId matches but ID is different, it means they renamed themselves.
+        // We MUST update the ID to the new one.
+        updatedUsers[existsIndex] = { ...updatedUsers[existsIndex], ...user, id: user.id };
         return { ...state, allUsers: updatedUsers, displayedUsers: updatedUsers };
       }
+      
+      // Otherwise, add as new
       const newUsers = [...state.allUsers, user];
       return { ...state, allUsers: newUsers, displayedUsers: newUsers };
     }

@@ -70,7 +70,7 @@ function handleMessage(ws, data) {
 // Handle User Identification
 function handleIdentify(ws, data) {
     // data: { type: 'identify', userId: '12345', publicKey: 'jwk_or_pem_string', info: { name: 'Nav', ... } }
-    const { userId, publicKey, info } = data;
+    const { userId, sessionId, publicKey, info } = data;
 
     if (!userId || !publicKey) {
         return;
@@ -79,9 +79,19 @@ function handleIdentify(ws, data) {
     console.log(`User Identified: ${info?.name || userId} (${userId})`);
 
     ws.userId = userId;
+    ws.sessionId = sessionId;
+    
+    // De-duplicate: If this session ID was already connected under a different userId, remove the old one
+    for (const [id, user] of connectedUsers.entries()) {
+        if (user.sessionId === sessionId && id !== userId) {
+            console.log(`Deduplicating: Replacing user [${id}] with [${userId}] for session ${sessionId}`);
+            connectedUsers.delete(id);
+        }
+    }
     
     connectedUsers.set(userId, {
         socket: ws,
+        sessionId: sessionId,
         publicKey: publicKey,
         info: info || {}
     });
@@ -97,6 +107,7 @@ function handleIdentify(ws, data) {
         type: 'user_connected',
         user: {
             id: userId,
+            sessionId: sessionId,
             publicKey: publicKey,
             info: info || {}
         }
@@ -136,6 +147,7 @@ function handleRouteMessage(ws, data) {
 function broadcastUserList() {
     const users = Array.from(connectedUsers.entries()).map(([id, u]) => ({
         id: id,
+        sessionId: u.sessionId, // Include session ID for client-side dedupe
         publicKey: u.publicKey,
         info: u.info,
         status: 'online'

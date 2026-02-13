@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export default function Sidebar() {
-  const { state, dispatch } = useAppContext();
+  const { state, dispatch, online } = useAppContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
 
@@ -24,7 +24,11 @@ export default function Sidebar() {
     if (state.globalInvokeFunc) {
       state.globalInvokeFunc('broadcast_discovery_query');
     }
-  }, [state.globalInvokeFunc]);
+    // Also trigger online identity broadcast
+    if (online?.broadcastIdentity) {
+      online.broadcastIdentity();
+    }
+  }, [state.globalInvokeFunc, online]);
 
   const displayName = localStorage.getItem('displayName') || 'New User';
   const username = localStorage.getItem('username') || 'anonymous';
@@ -234,7 +238,10 @@ export default function Sidebar() {
               </div>
             )}
             {/* Online indicator */}
-            <span className="absolute -bottom-0.5 -right-0.5 block h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 status-online-glow" />
+            <span 
+              className={`absolute -bottom-0.5 -right-0.5 block h-3.5 w-3.5 rounded-full border-2 border-white dark:border-slate-900 transition-all duration-300 ${online.isOnline ? 'bg-emerald-500 status-online-glow' : 'bg-red-500'}`}
+              title={online.isOnline ? 'Connected to Relay' : 'Disconnected'}
+            />
           </div>
           <div className="flex-grow overflow-hidden min-w-0">
             <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-medium">Welcome,</p>

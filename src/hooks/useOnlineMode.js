@@ -10,6 +10,9 @@ export function useOnlineMode(dispatch, getState) {
     const [keyPair, setKeyPair] = useState(null);
     const [isOnline, setIsOnline] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
+    
+    // Stable ID for the session (tab) - MUST be unique per tab to avoid server deduplicating valid separate sessions
+    const clientSessionId = useRef(Math.random().toString(36).substr(2, 9) + Date.now().toString(36));
 
     // Store shared keys: { [userId]: CryptoKey }
     const sharedKeys = useRef({}); 
@@ -18,9 +21,11 @@ export function useOnlineMode(dispatch, getState) {
 
     const wsRef = useRef(null);
     const pendingMessages = useRef([]); // [{targetId, text}]
+    const handleServerMessageRef = useRef(null);
 
     // Connect to WebSocket Server (Moved to avoid TDZ)
     const connect = useCallback((serverUrl) => {
+        console.log(`🔌 Attempting connection to: ${serverUrl}`);
         // Close existing socket and clear its handler to prevent state updates
         if (wsRef.current) {
             wsRef.current.onclose = null; // Important: Stop old socket from triggering close logic
@@ -32,7 +37,7 @@ export function useOnlineMode(dispatch, getState) {
             wsRef.current = socket;
 
             socket.onopen = () => {
-                console.log('Connected to Relay Server');
+                console.log('✅ Connected to Relay Server');
                 setIsOnline(true);
                 setWs(socket); 
             };
@@ -40,18 +45,18 @@ export function useOnlineMode(dispatch, getState) {
             socket.onmessage = async (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    handleServerMessage(data);
+                    handleServerMessageRef.current?.(data);
                 } catch (e) {
                     console.error("Error parsing server message", e);
                 }
             };
 
             socket.onerror = (error) => {
-                console.error("WebSocket Error:", error);
+                console.error("❌ WebSocket Error:", error);
             };
 
-            socket.onclose = () => {
-                console.log('Disconnected from Relay Server');
+            socket.onclose = (event) => {
+                console.log(`⚠️ Disconnected from Relay Server (Code: ${event.code})`);
                 // Only update state if this is still the active socket
                 if (wsRef.current === socket) {
                     setIsOnline(false);
@@ -121,7 +126,16 @@ export function useOnlineMode(dispatch, getState) {
 
         function checkConnection(keysAreReady = false) {
             const mode = localStorage.getItem('connectionMode') || 'online';
-            const url = localStorage.getItem('relayServerUrl');
+            // Default to localhost if not set, or the Oracle one if you prefer. 
+            // Given the user is running 'sudo netstat ... 8080' locally, localhost is the safest bet for immediate success.
+            let url = localStorage.getItem('relayServerUrl');
+            
+            if (!url) {
+                url = 'ws://129.154.231.157:8080';
+                console.log("⚠️ No relay URL found in storage, defaulting to Oracle VM:", url);
+                // Optionally save it so settings UI reflects it? 
+                // localStorage.setItem('relayServerUrl', url); 
+            }
             
             if (mode === 'online' && url) {
                 if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
@@ -184,24 +198,31 @@ export function useOnlineMode(dispatch, getState) {
 
 
     // Identify when both Socket and Keys are ready
+    // Identify when both Socket and Keys are ready
     useEffect(() => {
-        if (ws && ws.readyState === WebSocket.OPEN && keyPair) {
-             const identify = async () => {
-                // Use Username as the primary unique ID if available, fallback to random userId
-                const myUsername = localStorage.getItem('username');
-                const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser' 
-                    ? myUsername 
-                    : String(localStorage.getItem('userId')); 
-                
+        if (!ws || ws.readyState !== WebSocket.OPEN || !keyPair) return;
+
+        const identify = async () => {
+            // Using ws directly instead of ref to ensure we use the TRIGGERING socket
+            if (ws.readyState !== WebSocket.OPEN) return;
+            
+            // Use Username as the primary unique ID if available, fallback to random userId
+            const myUsername = localStorage.getItem('username');
+            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser' 
+                ? myUsername 
+                : String(localStorage.getItem('userId')); 
+            
+            try {
                 const pubKeyJwk = await exportKey(keyPair.publicKey);
                 const name = localStorage.getItem('displayName') || myId;
                 const profilePicture = localStorage.getItem('profilePicture') || null;
 
-                console.log(`🔑 Identifying as [${myId}] and sharing Public Key`);
+                console.log(`🔑 Identifying as [${myId}] on session [${clientSessionId.current}]`);
 
                 ws.send(JSON.stringify({
                     type: 'identify',
                     userId: myId,
+                    sessionId: clientSessionId.current, // Add persistent session tracking
                     publicKey: pubKeyJwk,
                     info: {
                         name: name,
@@ -209,13 +230,41 @@ export function useOnlineMode(dispatch, getState) {
                         profilePicture: profilePicture
                     }
                 }));
-             };
-             identify();
+            } catch (e) {
+                console.error("Identity export failed", e);
+            }
+        };
+        
+        identify();
+    }, [ws, keyPair, localStorage.getItem('displayName'), localStorage.getItem('username'), localStorage.getItem('profilePicture')]);
+
+    const broadcastIdentity = useCallback(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && keyPair) {
+            const myUsername = localStorage.getItem('username');
+            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser' 
+                ? myUsername 
+                : String(localStorage.getItem('userId')); 
+            
+            exportKey(keyPair.publicKey).then(pubKeyJwk => {
+                const name = localStorage.getItem('displayName') || myId;
+                console.log(`📣 Broadcasting Identity manually as [${myId}]...`);
+                wsRef.current.send(JSON.stringify({
+                    type: 'identify',
+                    userId: myId,
+                    sessionId: clientSessionId.current,
+                    publicKey: pubKeyJwk,
+                    info: {
+                        name: name,
+                        username: myId,
+                        profilePicture: localStorage.getItem('profilePicture') || null
+                    }
+                }));
+                console.log("📣 Manual Identity Broadcast Sent");
+            });
         }
-    }, [ws, keyPair]);
+    }, [keyPair]);
 
     const handleServerMessage = async (data) => {
-        if (!isInitialized) return;
         const { type } = data;
 
         switch (type) {
@@ -231,16 +280,17 @@ export function useOnlineMode(dispatch, getState) {
                         const importedKey = await importPublicKey(newUser.publicKey);
                         userPublicKeys.current[newUser.id] = importedKey;
                         savePeerKey(newUser.id, newUser.publicKey);
-                        console.log(`📡 Captured Public Key for new user: ${newUser.id}`);
+                        // console.log(`📡 Captured Public Key for new user: ${newUser.id}`);
                         
                         // Add to Sidebar/Context
                         const numId = parseInt(newUser.id, 10);
                         const sId = isNaN(numId) ? newUser.id : numId;
-                        console.log(`👤 Adding user to sidebar: ${sId} (${newUser.info.name})`);
+                        console.log(`👤 Adding user to sidebar: ${sId} (${newUser.info.name}) [Session: ${newUser.sessionId}]`);
                         dispatch({
                             type: 'ADD_USER',
                             payload: {
                                 id: sId,
+                                sessionId: newUser.sessionId, // IMPORTANT: Used for client-side dedupe
                                 name: newUser.info.name || 'Unknown User',
                                 username: newUser.info.username || 'unknown',
                                 profile_picture: newUser.info.profilePicture, 
@@ -280,25 +330,23 @@ export function useOnlineMode(dispatch, getState) {
                     }
                 }));
 
-                // Update App Context (Add/Update Users)
-                others.forEach(u => {
-                    // Convert ID to match app's internal Number format if possible, or keep as string
+                // Update App Context (Full Sync)
+                const userListForContext = others.map(u => {
                     const numericId = parseInt(u.id, 10);
                     const safeId = isNaN(numericId) ? u.id : numericId;
-
-                    dispatch({
-                        type: 'ADD_USER',
-                        payload: {
-                            id: safeId,
-                            name: u.info.name || 'Unknown User',
-                            username: u.info.username || 'unknown',
-                            profile_picture: u.info.profilePicture, 
-                            status: 'online',
-                            avatarGradient: 'from-blue-500 to-purple-500' 
-                        }
-                    });
-                    console.log(`👤 Discovered user from list: ${safeId}`);
+                    return {
+                        id: safeId,
+                        sessionId: u.sessionId, // IMPORTANT
+                        name: u.info.name || 'Unknown User',
+                        username: u.info.username || 'unknown',
+                        profile_picture: u.info.profilePicture, 
+                        status: 'online',
+                        avatarGradient: 'from-blue-500 to-purple-500' 
+                    };
                 });
+
+                dispatch({ type: 'SET_USERS', payload: userListForContext });
+                console.log(`📡 Synced ${userListForContext.length} users from relay`);
                 break;
             }
 
@@ -389,6 +437,8 @@ export function useOnlineMode(dispatch, getState) {
         }
     };
 
+    handleServerMessageRef.current = handleServerMessage;
+
     const savePeerKey = (id, jwk) => {
         try {
             const cached = JSON.parse(localStorage.getItem('peerPublicKeys') || '{}');
@@ -473,5 +523,5 @@ export function useOnlineMode(dispatch, getState) {
         }
     }, [dispatch, keyPair]);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline }), [connect, sendMessageOnline, isOnline]);
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity }), [connect, sendMessageOnline, isOnline, broadcastIdentity]);
 }
