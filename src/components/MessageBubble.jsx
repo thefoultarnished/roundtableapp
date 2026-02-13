@@ -49,8 +49,14 @@ export default function MessageBubble({ message }) {
       <div className={`flex items-end gap-2 max-w-[80%] ${animClass}`}>
         {!isSentByMe && senderAvatar}
         <div className="flex-1 min-w-0">
-          <div className={`px-4 pt-2 pb-5 relative rounded-2xl ${messageColor} ${isSentByMe ? 'rounded-br-md' : 'rounded-bl-md'} transition-all duration-300 hover:shadow-xl`}>
-            {formattedText && <p className="leading-relaxed break-words text-[13px]" dangerouslySetInnerHTML={{ __html: formattedText }} />}
+          <div className={`px-4 py-2 relative rounded-2xl ${messageColor} ${isSentByMe ? 'rounded-br-md' : 'rounded-bl-md'} transition-all duration-300 hover:shadow-xl`}>
+            {formattedText && (
+              <div className="leading-relaxed break-words text-[13px] whitespace-pre-wrap">
+                <span dangerouslySetInnerHTML={{ __html: formattedText }} />
+                {/* Phantom spacer ensures single-line bubble expands or multiline wraps to fit timestamp */}
+                <span className="inline-block w-12 h-0"></span>
+              </div>
+            )}
             <div className={`absolute bottom-1 right-3 text-[9px] font-mono leading-none ${timestampColor}`}>
               {message.time}
             </div>
