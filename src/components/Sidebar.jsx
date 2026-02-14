@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export default function Sidebar() {
@@ -6,6 +6,13 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
+
+  // Clear search on logout
+  useEffect(() => {
+    if (!state.currentUser) {
+      setSearchQuery('');
+    }
+  }, [state.currentUser]);
 
   const friends = state.friends;
   const pendingRequests = state.pendingFriendRequests;
