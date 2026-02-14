@@ -222,8 +222,8 @@ export default function SettingsModal() {
                 <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} placeholder="Name" />
               </div>
               <div>
-                <label className={labelClass}>Username (@)</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className={inputClass} placeholder="Unique ID" />
+                <label className={labelClass}>Username (@) <span className="text-[8px] text-slate-500 font-normal">Cannot be changed</span></label>
+                <input type="text" value={username} disabled className={inputClass + " opacity-60 cursor-not-allowed"} placeholder="Unique ID" />
               </div>
             </div>
           </div>

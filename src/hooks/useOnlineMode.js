@@ -592,14 +592,20 @@ export function useOnlineMode(dispatch, getState) {
             }
 
             case 'friend_request_received': {
-                console.log('🔔 Friend request received from:', data.senderId);
-                dispatch({ type: 'ADD_PENDING_REQUEST', payload: { sender_id: data.senderId } });
+                console.log('🔔 Friend request received from:', data.senderUsername || data.senderId);
+                // Refresh friend requests from server to get enriched data
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({ type: 'get_friend_requests' }));
+                }
                 break;
             }
 
             case 'friend_request_sent': {
                 console.log('📤 Friend request sent to:', data.receiverUsername);
-                dispatch({ type: 'ADD_SENT_REQUEST', payload: data.receiverUsername });
+                // Refresh sent requests from server to get current state
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    wsRef.current.send(JSON.stringify({ type: 'get_sent_friend_requests' }));
+                }
                 break;
             }
 

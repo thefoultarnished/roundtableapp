@@ -869,14 +869,18 @@ function handleSendFriendRequest(ws, data) {
       })
     );
 
-    // Notify receiver if they're online (using userId, not username)
+    // Notify receiver if they're online - tell them to refresh their requests
     const receiver = connectedUsers.get(receiverUser.user_id);
     if (receiver && receiver.socket.readyState === WebSocket.OPEN) {
+      // Get sender's info for the notification
+      const senderInfo = db.prepare(`SELECT username, display_name FROM users WHERE user_id = ?`).get(ws.userId);
+
       receiver.socket.send(
         JSON.stringify({
           type: "friend_request_received",
           senderId: ws.userId,
-          senderUsername: ws.userId,
+          senderUsername: senderInfo?.username || ws.userId,
+          senderDisplayName: senderInfo?.display_name || senderInfo?.username || ws.userId,
         })
       );
     }
