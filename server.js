@@ -527,34 +527,47 @@ function handleIdentify(ws, data) {
     return;
   }
 
-  console.log(`User Identified: ${info?.name || userId} (${userId})`);
-
-  ws.userId = userId;
-  ws.sessionId = sessionId;
-
   const now = Date.now();
+  const username =
+    info?.username && info.username.trim()
+      ? info.username
+      : info?.name || userId;
 
-  // Save/Update user in database
+  // Validate: If no password provided (auto-login), check if user exists in DB
   try {
+    const checkUserStmt = db.prepare(
+      `SELECT user_id, password_hash FROM users WHERE username = ?`,
+    );
+    const existingUser = checkUserStmt.get(username);
+
+    // If no password and user doesn't exist → invalid session (stale localStorage)
+    if (!password && !existingUser) {
+      console.log(`❌ Invalid session: User "${username}" not found in DB`);
+      ws.send(
+        JSON.stringify({
+          type: "invalid_session",
+          reason: "User not found. Please login again.",
+        }),
+      );
+      return;
+    }
+
+    console.log(`User Identified: ${info?.name || userId} (${userId})`);
+
+    ws.userId = userId;
+    ws.sessionId = sessionId;
+
     // If password provided (signup), hash it
     let passwordHash = null;
     if (password) {
       passwordHash = hashPassword(password);
     }
 
-    const username =
-      info?.username && info.username.trim()
-        ? info.username
-        : info?.name || userId;
     const displayName = info?.name && info.name.trim() ? info.name : username;
     const publicKeyStr = JSON.stringify(publicKey);
     const profilePic = info?.profilePicture || null;
 
-    // Check if user exists (by username since that's our identifier now)
-    const checkUserStmt = db.prepare(
-      `SELECT user_id FROM users WHERE username = ?`,
-    );
-    const userExists = checkUserStmt.get(username);
+    const userExists = existingUser;
 
     if (userExists) {
       // User exists - update them (keep password if they have one)

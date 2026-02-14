@@ -210,12 +210,13 @@ export function useOnlineMode(dispatch, getState) {
             // Using ws directly instead of ref to ensure we use the TRIGGERING socket
             if (ws.readyState !== WebSocket.OPEN) return;
 
-            // Use username as the unique ID
-            const myUsername = localStorage.getItem('username');
+            // Use username as the unique ID - check both sources
+            const myUsername = localStorage.getItem('username') || getState().currentUser?.username;
 
             // DON'T identify if not logged in (no username set)
             if (!myUsername || myUsername === 'Anonymous' || myUsername === 'RoundtableUser') {
-                console.log('⏸️  Skipping identify - not logged in');
+                console.log('⏸️  Invalid username detected, logging out...');
+                dispatch({ type: 'LOGOUT' });
                 return;
             }
 
@@ -245,7 +246,10 @@ export function useOnlineMode(dispatch, getState) {
 
                 // Clear temporary password after sending (but keep authPassword for session persistence)
                 localStorage.removeItem('tempAuthPassword');
-                authPasswordRef.current = null;
+                // Don't clear authPasswordRef immediately - it might be needed for reconnect
+                setTimeout(() => {
+                    authPasswordRef.current = null;
+                }, 5000);
             } catch (e) {
                 console.error("Identity export failed", e);
             }
@@ -253,6 +257,43 @@ export function useOnlineMode(dispatch, getState) {
 
         identify();
     }, [ws, keyPair]);
+
+    const sendIdentifyWithPassword = useCallback(async () => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !keyPair) {
+            console.warn('❌ Cannot send identify: not ready');
+            return;
+        }
+
+        const myUsername = localStorage.getItem('username');
+        if (!myUsername) {
+            console.warn('❌ No username found');
+            return;
+        }
+
+        try {
+            const pubKeyJwk = await exportKey(keyPair.publicKey);
+            const name = localStorage.getItem('displayName') || myUsername;
+            const password = authPasswordRef.current || localStorage.getItem('authPassword');
+
+            console.log(`🔑 Sending identify with password for [${myUsername}]`);
+
+            wsRef.current.send(JSON.stringify({
+                type: 'identify',
+                userId: myUsername,
+                sessionId: clientSessionId.current,
+                publicKey: pubKeyJwk,
+                password: password,
+                info: {
+                    name: name,
+                    username: myUsername
+                }
+            }));
+
+            console.log(`✅ Identify sent with password`);
+        } catch (e) {
+            console.error('❌ Failed to send identify:', e);
+        }
+    }, [keyPair]);
 
     const broadcastIdentity = useCallback(() => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && keyPair) {
@@ -641,6 +682,14 @@ export function useOnlineMode(dispatch, getState) {
                 break;
             }
 
+            case 'invalid_session': {
+                console.log('❌ Invalid session detected:', data.reason);
+                // Auto-logout: clear localStorage and reset state
+                dispatch({ type: 'LOGOUT' });
+                alert(data.reason || 'Your session is invalid. Please login again.');
+                break;
+            }
+
             case 'registered': {
                 console.log('✅ Registered with server, syncing friend data...');
 
@@ -1018,5 +1067,5 @@ export function useOnlineMode(dispatch, getState) {
         console.log(`📸 Sent profile picture update to server`);
     }, []);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate]);
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate }), [connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate]);
 }

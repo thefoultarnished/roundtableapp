@@ -9,7 +9,19 @@ const initialState = {
   currentUser: (() => {
     try {
       const stored = localStorage.getItem('currentUser');
-      return stored ? JSON.parse(stored) : null;
+      if (!stored) return null;
+
+      const user = JSON.parse(stored);
+      // Validate username - if invalid, clear localStorage and return null
+      if (!user.username || user.username === 'Anonymous' || user.username === 'RoundtableUser') {
+        console.log('⚠️  Invalid user in localStorage, clearing...');
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('username');
+        localStorage.removeItem('displayName');
+        return null;
+      }
+
+      return user;
     } catch {
       return null;
     }

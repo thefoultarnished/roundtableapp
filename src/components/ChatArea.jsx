@@ -293,6 +293,13 @@ export default function ChatArea() {
                       }
                     });
 
+                    // Send identify with password for signup
+                    setTimeout(() => {
+                      if (online?.sendIdentifyWithPassword) {
+                        online.sendIdentifyWithPassword();
+                      }
+                    }, 100);
+
                     setAuthMode(null);
                     setAuthUsername('');
                     setAuthDisplayName('');
