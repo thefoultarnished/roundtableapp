@@ -896,11 +896,20 @@ function handleAcceptFriendRequest(ws, data) {
     createFriendship.run(senderId, ws.userId, now);
     console.log(`✅ Friend request accepted: ${senderId} <-> ${ws.userId}`);
 
-    // Notify acceptor
+    // Notify acceptor with full friends list refresh
     ws.send(
       JSON.stringify({
         type: "friend_request_accepted",
         friendId: senderId,
+      })
+    );
+    // Also send updated friends list to acceptor
+    const acceptorFriends = getFriendsList.all(ws.userId);
+    const acceptorFriendIds = acceptorFriends.map(f => f.friend_id);
+    ws.send(
+      JSON.stringify({
+        type: "friends_list",
+        friends: acceptorFriendIds,
       })
     );
 
@@ -911,6 +920,15 @@ function handleAcceptFriendRequest(ws, data) {
         JSON.stringify({
           type: "friend_request_accepted",
           friendId: ws.userId,
+        })
+      );
+      // Also send updated friends list to sender
+      const senderFriends = getFriendsList.all(senderId);
+      const senderFriendIds = senderFriends.map(f => f.friend_id);
+      sender.socket.send(
+        JSON.stringify({
+          type: "friends_list",
+          friends: senderFriendIds,
         })
       );
     }
