@@ -55,6 +55,22 @@ export function getSafeUserId() {
 }
 
 /**
+ * Gets or creates a PERSISTENT user ID that doesn't change when username changes
+ * This is different from the username - it's a unique identifier for the user account
+ */
+export function getPersistentUserId() {
+    let persistentId = localStorage.getItem('persistentUserId');
+
+    if (!persistentId) {
+        persistentId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('persistentUserId', persistentId);
+        console.log(`✅ Created persistent user ID: ${persistentId}`);
+    }
+
+    return persistentId;
+}
+
+/**
  * Resizes an image to specified dimensions using canvas
  */
 export function resizeImage(base64Str, maxWidth, maxHeight, callback) {

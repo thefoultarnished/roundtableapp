@@ -4,7 +4,7 @@ import { useNetwork } from '../hooks/useNetwork';
 import GlassDropdown from './GlassDropdown';
 
 export default function SettingsModal() {
-  const { state, dispatch } = useAppContext();
+  const { state, dispatch, online } = useAppContext();
   const { announcePresence } = useNetwork();
 
   const [displayName, setDisplayName] = useState('');
@@ -88,13 +88,20 @@ export default function SettingsModal() {
       if (root) {
         if (windowTransparency) {
            const isDark = theme === 'dark' || theme === 'aurora';
-           root.style.background = isDark 
-              ? `rgba(2, 6, 23, ${windowOpacity})` 
+           root.style.background = isDark
+              ? `rgba(2, 6, 23, ${windowOpacity})`
               : `rgba(235, 238, 244, ${windowOpacity})`;
         } else {
            const isDark = theme === 'dark' || theme === 'aurora';
            root.style.background = isDark ? '#020617' : '#e2e8f0';
         }
+      }
+
+      // Announce presence changes to server (for online mode)
+      if (online?.broadcastIdentity) {
+        online.broadcastIdentity();
+      } else if (announcePresence) {
+        announcePresence();
       }
 
       // Briefly show saving status

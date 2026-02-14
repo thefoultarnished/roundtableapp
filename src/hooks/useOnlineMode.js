@@ -206,7 +206,7 @@ export function useOnlineMode(dispatch, getState) {
             // Using ws directly instead of ref to ensure we use the TRIGGERING socket
             if (ws.readyState !== WebSocket.OPEN) return;
 
-            // Use Username as the primary unique ID if available, fallback to random userId
+            // Use persistent userId (not username) - username can change
             const myUsername = localStorage.getItem('username');
 
             // DON'T identify if not logged in (no username set)
@@ -215,7 +215,15 @@ export function useOnlineMode(dispatch, getState) {
                 return;
             }
 
-            const myId = myUsername;
+            // Get or create ONE persistent user ID (not per username)
+            let myId = localStorage.getItem('appUserId');
+            if (!myId) {
+                myId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                localStorage.setItem('appUserId', myId);
+                console.log(`✅ Created persistent app user ID: ${myId}`);
+            } else {
+                console.log(`✅ Using existing persistent app user ID: ${myId}`);
+            }
 
             try {
                 const pubKeyJwk = await exportKey(keyPair.publicKey);
@@ -235,7 +243,7 @@ export function useOnlineMode(dispatch, getState) {
                     password: authPasswordRef.current, // Include password if set during signup
                     info: {
                         name: name,
-                        username: myId,
+                        username: myUsername,
                         profilePicture: profilePicture
                     }
                 }));
@@ -253,9 +261,13 @@ export function useOnlineMode(dispatch, getState) {
     const broadcastIdentity = useCallback(() => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && keyPair) {
             const myUsername = localStorage.getItem('username');
-            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser'
-                ? myUsername
-                : String(localStorage.getItem('userId'));
+
+            // Get or create ONE persistent user ID for the entire app
+            let myId = localStorage.getItem('appUserId');
+            if (!myId) {
+                myId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                localStorage.setItem('appUserId', myId);
+            }
 
             exportKey(keyPair.publicKey).then(pubKeyJwk => {
                 const name = localStorage.getItem('displayName') || myId;
@@ -271,7 +283,7 @@ export function useOnlineMode(dispatch, getState) {
                     publicKey: pubKeyJwk,
                     info: {
                         name: name,
-                        username: myId,
+                        username: myUsername,
                         profilePicture: localStorage.getItem('profilePicture') || null
                     }
                 }));
@@ -289,10 +301,12 @@ export function useOnlineMode(dispatch, getState) {
             return;
         }
 
-        const myUn = localStorage.getItem('username');
-        const myId = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser'
-            ? myUn
-            : String(localStorage.getItem('userId'));
+        // Get persistent user ID (global to app)
+        let myId = localStorage.getItem('appUserId');
+        if (!myId) {
+            console.warn(`⚠️ No persistent ID found`);
+            return;
+        }
 
         console.log(`📜 Requesting chat history with ${targetUserId}... (myId: ${myId})`);
         wsRef.current.send(JSON.stringify({
@@ -339,10 +353,12 @@ export function useOnlineMode(dispatch, getState) {
         switch (type) {
             case 'user_connected': {
                 const newUser = data.user;
-                const myUn = localStorage.getItem('username');
-                const myIdOnConnect = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser'
-                    ? myUn
-                    : String(localStorage.getItem('userId'));
+                // Get persistent user ID (global to app)
+                let myIdOnConnect = localStorage.getItem('appUserId');
+                if (!myIdOnConnect) {
+                    myIdOnConnect = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    localStorage.setItem('appUserId', myIdOnConnect);
+                }
 
                 if (newUser && String(newUser.id) !== String(myIdOnConnect) && newUser.publicKey) {
                     try {
@@ -377,11 +393,8 @@ export function useOnlineMode(dispatch, getState) {
             }
 
             case 'user_list': {
-                // Filter out self
-                const myUnList = localStorage.getItem('username');
-                const myIdList = myUnList && myUnList !== 'Anonymous' && myUnList !== 'RoundtableUser'
-                    ? myUnList
-                    : String(localStorage.getItem('userId'));
+                // Filter out self - use persistent user ID (global to app)
+                const myIdList = localStorage.getItem('appUserId');
 
                 const others = data.users.filter(u => String(u.id) !== String(myIdList));
 
@@ -444,13 +457,11 @@ export function useOnlineMode(dispatch, getState) {
 
                     const formattedMessages = await Promise.all(messages.map(async (msg) => {
                         let decryptedText = '';
-                        const myUn = localStorage.getItem('username');
-                        const myId = myUn && myUn !== 'Anonymous' && myUn !== 'RoundtableUser'
-                            ? myUn
-                            : String(localStorage.getItem('userId'));
+                        // Get persistent user ID (global to app)
+                        const myId = localStorage.getItem('appUserId');
 
                         // Check if sender is me
-                        const isFromMe = msg.senderId === myId || msg.senderId === localStorage.getItem('userId');
+                        const isFromMe = msg.senderId === myId;
 
                         try {
                             // Decrypt if encrypted
