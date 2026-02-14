@@ -179,6 +179,16 @@ const createFriendship = db.prepare(`
   ON CONFLICT(user_id, friend_id) DO NOTHING
 `);
 
+const getFriendsList = db.prepare(`
+  SELECT friend_id FROM friendships WHERE user_id = ?
+`);
+
+const getSentFriendRequests = db.prepare(`
+  SELECT receiver_id, created_at FROM friend_requests
+  WHERE sender_id = ? AND status = 'pending'
+  ORDER BY created_at DESC
+`);
+
 // Create HTTP server
 const server = http.createServer((req, res) => {
   res.writeHead(200);
@@ -278,6 +288,12 @@ function handleMessage(ws, data) {
       break;
     case "decline_friend_request":
       handleDeclineFriendRequest(ws, data);
+      break;
+    case "get_friends_list":
+      handleGetFriendsList(ws, data);
+      break;
+    case "get_sent_friend_requests":
+      handleGetSentFriendRequests(ws, data);
       break;
     default:
       console.log("Unknown message type:", data.type);
@@ -824,16 +840,22 @@ function handleSendFriendRequest(ws, data) {
     sendFriendRequest.run(ws.userId, receiverUsername, now, now, now);
     console.log(`📤 Friend request sent from ${ws.userId} to ${receiverUsername}`);
 
-    // Notify receiver if they're online
-    const receiver = Array.from(connectedUsers.values()).find(
-      u => u.info?.username === receiverUsername
+    // Send confirmation back to sender
+    ws.send(
+      JSON.stringify({
+        type: "friend_request_sent",
+        receiverUsername: receiverUsername,
+      })
     );
+
+    // Notify receiver if they're online
+    const receiver = connectedUsers.get(receiverUsername);
     if (receiver && receiver.socket.readyState === WebSocket.OPEN) {
       receiver.socket.send(
         JSON.stringify({
           type: "friend_request_received",
           senderId: ws.userId,
-          senderUsername: ws.userId, // Update this if you have username stored
+          senderUsername: ws.userId,
         })
       );
     }
@@ -874,12 +896,24 @@ function handleAcceptFriendRequest(ws, data) {
     createFriendship.run(senderId, ws.userId, now);
     console.log(`✅ Friend request accepted: ${senderId} <-> ${ws.userId}`);
 
+    // Notify acceptor
     ws.send(
       JSON.stringify({
         type: "friend_request_accepted",
         friendId: senderId,
       })
     );
+
+    // Notify original sender if online
+    const sender = connectedUsers.get(senderId);
+    if (sender && sender.socket.readyState === WebSocket.OPEN) {
+      sender.socket.send(
+        JSON.stringify({
+          type: "friend_request_accepted",
+          friendId: ws.userId,
+        })
+      );
+    }
   } catch (err) {
     console.error("Error accepting friend request:", err.message);
   }
@@ -895,14 +929,66 @@ function handleDeclineFriendRequest(ws, data) {
     declineFriendRequest.run(now, senderId, ws.userId);
     console.log(`❌ Friend request declined: ${senderId} -> ${ws.userId}`);
 
+    // Notify decliner
     ws.send(
       JSON.stringify({
         type: "friend_request_declined",
         friendId: senderId,
       })
     );
+
+    // Notify original sender if online (so they see + button again)
+    const sender = connectedUsers.get(senderId);
+    if (sender && sender.socket.readyState === WebSocket.OPEN) {
+      sender.socket.send(
+        JSON.stringify({
+          type: "friend_request_declined",
+          friendId: ws.userId,
+        })
+      );
+    }
   } catch (err) {
     console.error("Error declining friend request:", err.message);
+  }
+}
+
+// Handle Get Friends List
+function handleGetFriendsList(ws, data) {
+  if (!ws.userId) return;
+
+  try {
+    const friends = getFriendsList.all(ws.userId);
+    const friendIds = friends.map(f => f.friend_id);
+    console.log(`👥 Retrieved ${friendIds.length} friends for ${ws.userId}`);
+
+    ws.send(
+      JSON.stringify({
+        type: "friends_list",
+        friends: friendIds,
+      })
+    );
+  } catch (err) {
+    console.error("Error getting friends list:", err.message);
+  }
+}
+
+// Handle Get Sent Friend Requests
+function handleGetSentFriendRequests(ws, data) {
+  if (!ws.userId) return;
+
+  try {
+    const requests = getSentFriendRequests.all(ws.userId);
+    const receiverIds = requests.map(r => r.receiver_id);
+    console.log(`📤 Retrieved ${receiverIds.length} sent requests for ${ws.userId}`);
+
+    ws.send(
+      JSON.stringify({
+        type: "sent_friend_requests_list",
+        requests: receiverIds,
+      })
+    );
+  } catch (err) {
+    console.error("Error getting sent friend requests:", err.message);
   }
 }
 

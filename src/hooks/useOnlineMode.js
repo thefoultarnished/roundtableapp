@@ -575,10 +575,59 @@ export function useOnlineMode(dispatch, getState) {
 
             case 'friend_request_received': {
                 console.log('🔔 Friend request received from:', data.senderId);
-                // Dispatch custom event to notify Sidebar to reload friend requests
-                window.dispatchEvent(new CustomEvent('friendRequestReceived', {
-                    detail: { senderId: data.senderId }
-                }));
+                dispatch({ type: 'ADD_PENDING_REQUEST', payload: { sender_id: data.senderId } });
+                break;
+            }
+
+            case 'friend_request_sent': {
+                console.log('📤 Friend request sent to:', data.receiverUsername);
+                dispatch({ type: 'ADD_SENT_REQUEST', payload: data.receiverUsername });
+                break;
+            }
+
+            case 'friend_request_accepted': {
+                console.log('✅ Friend request accepted, new friend:', data.friendId);
+                dispatch({ type: 'ADD_FRIEND', payload: data.friendId });
+                dispatch({ type: 'REMOVE_SENT_REQUEST', payload: data.friendId });
+                dispatch({ type: 'REMOVE_PENDING_REQUEST', payload: data.friendId });
+                break;
+            }
+
+            case 'friend_request_declined': {
+                console.log('❌ Friend request declined by:', data.friendId);
+                dispatch({ type: 'REMOVE_SENT_REQUEST', payload: data.friendId });
+                dispatch({ type: 'REMOVE_PENDING_REQUEST', payload: data.friendId });
+                break;
+            }
+
+            case 'friends_list': {
+                console.log('👥 Received friends list:', data.friends);
+                dispatch({ type: 'SET_FRIENDS', payload: data.friends });
+                break;
+            }
+
+            case 'sent_friend_requests_list': {
+                console.log('📤 Received sent requests:', data.requests);
+                dispatch({ type: 'SET_SENT_REQUESTS', payload: data.requests });
+                break;
+            }
+
+            case 'friend_requests_list': {
+                console.log('📥 Received pending requests:', data.requests);
+                dispatch({ type: 'SET_PENDING_REQUESTS', payload: data.requests });
+                break;
+            }
+
+            case 'registered': {
+                console.log('✅ Registered with server, syncing friend data...');
+                // Sync friend state from server on login
+                setTimeout(() => {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(JSON.stringify({ type: 'get_friend_requests' }));
+                        wsRef.current.send(JSON.stringify({ type: 'get_friends_list' }));
+                        wsRef.current.send(JSON.stringify({ type: 'get_sent_friend_requests' }));
+                    }
+                }, 100);
                 break;
             }
 
@@ -850,39 +899,27 @@ export function useOnlineMode(dispatch, getState) {
     }, []);
 
     const getFriendRequests = useCallback(() => {
-        return new Promise((resolve) => {
-            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-                console.error('WebSocket not connected');
-                resolve([]);
-                return;
-            }
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return;
+        }
+        wsRef.current.send(JSON.stringify({ type: 'get_friend_requests' }));
+    }, []);
 
-            const originalOnmessage = wsRef.current.onmessage;
-            const handler = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'friend_requests_list') {
-                        wsRef.current.onmessage = originalOnmessage;
-                        resolve(data.requests || []);
-                    }
-                } catch (e) {
-                    console.error('Error parsing friend requests:', e);
-                }
-            };
+    const getFriendsList = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return;
+        }
+        wsRef.current.send(JSON.stringify({ type: 'get_friends_list' }));
+    }, []);
 
-            wsRef.current.onmessage = handler;
-            wsRef.current.send(JSON.stringify({
-                type: 'get_friend_requests'
-            }));
-
-            // Timeout after 5 seconds
-            setTimeout(() => {
-                if (wsRef.current && wsRef.current.onmessage === handler) {
-                    wsRef.current.onmessage = originalOnmessage;
-                    resolve([]);
-                }
-            }, 5000);
-        });
+    const getSentFriendRequests = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return;
+        }
+        wsRef.current.send(JSON.stringify({ type: 'get_sent_friend_requests' }));
     }, []);
 
     const acceptFriendRequest = useCallback((senderId) => {
@@ -907,5 +944,5 @@ export function useOnlineMode(dispatch, getState) {
         }));
     }, []);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, acceptFriendRequest, declineFriendRequest }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, acceptFriendRequest, declineFriendRequest]);
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest]);
 }

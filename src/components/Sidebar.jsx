@@ -1,77 +1,34 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export default function Sidebar() {
   const { state, dispatch, online } = useAppContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-  const [friends, setFriends] = useState(() => {
-    const stored = localStorage.getItem('friends');
-    return stored ? JSON.parse(stored) : [];
-  });
-  const [pendingRequests, setPendingRequests] = useState([]);
   const [showRequests, setShowRequests] = useState(false);
 
-  // Load pending friend requests from server when user logs in
-  useEffect(() => {
-    if (!state.currentUser || !online) return;
-
-    const loadFriendRequests = () => {
-      if (online.getFriendRequests) {
-        online.getFriendRequests().then(requests => {
-          if (requests) {
-            setPendingRequests(requests);
-          }
-        });
-      }
-    };
-
-    // Initial load
-    loadFriendRequests();
-
-    // Listen for incoming friend requests
-    const handleFriendRequestReceived = (event) => {
-      console.log('🔔 Reloading friend requests after notification');
-      loadFriendRequests();
-    };
-
-    window.addEventListener('friendRequestReceived', handleFriendRequestReceived);
-
-    return () => {
-      window.removeEventListener('friendRequestReceived', handleFriendRequestReceived);
-    };
-  }, [state.currentUser, online]);
+  const friends = state.friends;
+  const pendingRequests = state.pendingFriendRequests;
+  const sentRequests = state.sentFriendRequests;
 
   const onlineCount = state.allUsers.filter(u => u.status === 'online').length;
 
-  const addFriend = (userId) => {
-    if (!friends.includes(userId)) {
-      const newFriends = [...friends, userId];
-      setFriends(newFriends);
-      localStorage.setItem('friends', JSON.stringify(newFriends));
+  const addFriend = (username) => {
+    if (online?.sendFriendRequest) {
+      online.sendFriendRequest(username);
     }
   };
 
-  const acceptFriendRequest = (senderId) => {
-    // Send to server
+  const handleAcceptFriendRequest = (senderId) => {
     if (online?.acceptFriendRequest) {
       online.acceptFriendRequest(senderId);
     }
-    // Update local state
-    const updated = pendingRequests.filter(r => r.sender_id !== senderId && r !== senderId);
-    setPendingRequests(updated);
-    // Add to friends
-    addFriend(senderId);
   };
 
-  const declineFriendRequest = (senderId) => {
-    // Send to server
+  const handleDeclineFriendRequest = (senderId) => {
     if (online?.declineFriendRequest) {
       online.declineFriendRequest(senderId);
     }
-    // Update local state
-    const updated = pendingRequests.filter(r => r.sender_id !== senderId && r !== senderId);
-    setPendingRequests(updated);
   };
 
   const searchResults = searchQuery
@@ -83,8 +40,8 @@ export default function Sidebar() {
       })
     : [];
 
-  const friendMatches = searchResults.filter(u => friends.includes(u.id || u.username));
-  const userMatches = searchResults.filter(u => !friends.includes(u.id || u.username));
+  const friendMatches = searchResults.filter(u => friends.includes(u.id) || friends.includes(u.username));
+  const userMatches = searchResults.filter(u => !friends.includes(u.id) && !friends.includes(u.username));
 
   const filteredUsers = !searchQuery ? state.displayedUsers : [];
 
@@ -285,7 +242,7 @@ export default function Sidebar() {
                   <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{userMatches.length}</span>
                 </div>
                 {userMatches.map((user, index) => (
-                  <UserItemWithAddFriend key={user.id} user={user} index={index} currentUsername={currentUsername} onAddFriend={() => addFriend(user.id || user.username)} />
+                  <UserItemWithAddFriend key={user.id} user={user} index={index} currentUsername={currentUsername} onAddFriend={() => addFriend(user.username || user.id)} isPending={sentRequests.includes(user.id) || sentRequests.includes(user.username)} />
                 ))}
               </div>
             )}
@@ -332,8 +289,9 @@ export default function Sidebar() {
                   isActive={user.id === state.activeChatUserId}
                   unreadCount={state.unreadCounts[user.id] || 0}
                   onClick={() => handleUserClick(user.id)}
-                  isFriend={friends.includes(user.id || user.username)}
-                  onAddFriend={() => addFriend(user.id || user.username)}
+                  isFriend={friends.includes(user.id) || friends.includes(user.username)}
+                  isPending={sentRequests.includes(user.id) || sentRequests.includes(user.username)}
+                  onAddFriend={() => addFriend(user.username || user.id)}
                 />
               ))}
             </div>
@@ -374,8 +332,9 @@ export default function Sidebar() {
                   isActive={user.id === state.activeChatUserId}
                   unreadCount={state.unreadCounts[user.id] || 0}
                   onClick={() => handleUserClick(user.id)}
-                  isFriend={friends.includes(user.id || user.username)}
-                  onAddFriend={() => addFriend(user.id || user.username)}
+                  isFriend={friends.includes(user.id) || friends.includes(user.username)}
+                  isPending={sentRequests.includes(user.id) || sentRequests.includes(user.username)}
+                  onAddFriend={() => addFriend(user.username || user.id)}
                 />
               ))}
             </div>
@@ -427,13 +386,13 @@ export default function Sidebar() {
                       </div>
                       <div className="flex gap-2 flex-shrink-0">
                         <button
-                          onClick={() => acceptFriendRequest(senderId)}
+                          onClick={() => handleAcceptFriendRequest(senderId)}
                           className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95"
                         >
                           Accept
                         </button>
                         <button
-                          onClick={() => declineFriendRequest(senderId)}
+                          onClick={() => handleDeclineFriendRequest(senderId)}
                           className="px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-slate-300 text-xs font-semibold hover:bg-white/20 transition-all active:scale-95"
                         >
                           Decline
@@ -496,23 +455,13 @@ export default function Sidebar() {
   );
 }
 
-function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername }) {
-  const { state, online } = useAppContext();
+function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername, isPending }) {
   const avatarHtml = user.profile_picture
     ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
       <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700 flex items-center justify-center shadow-lg ring-2 ring-white/20">
       </div>
     );
-
-  const handleSendRequest = () => {
-    onAddFriend();
-
-    // Send friend request to server
-    if (online?.sendFriendRequest) {
-      online.sendFriendRequest(user.username);
-    }
-  };
 
   return (
     <div className="flex items-center p-2.5 rounded-app hover:bg-white/20 dark:hover:bg-white/5 transition-all duration-300 group border border-white/10 hover:border-cyan-400/30">
@@ -528,21 +477,26 @@ function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername }) {
         <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{user.name}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{user.username || 'unknown'}</p>
       </div>
-      <button
-        onClick={handleSendRequest}
-        title="Send friend request"
-        className="ml-2 p-2 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-110 active:scale-95 flex-shrink-0"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-        </svg>
-      </button>
+      {isPending ? (
+        <span className="ml-2 px-2 py-1 rounded-lg text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 flex-shrink-0">
+          Pending
+        </span>
+      ) : (
+        <button
+          onClick={onAddFriend}
+          title="Send friend request"
+          className="ml-2 p-2 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-110 active:scale-95 flex-shrink-0"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
 
-function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, onAddFriend }) {
-  const { online } = useAppContext();
+function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPending, onAddFriend }) {
   const avatarHtml = user.profile_picture
     ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
@@ -551,13 +505,9 @@ function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, onAdd
     );
 
   const handleSendRequest = (e) => {
-    e.stopPropagation(); // Prevent opening chat when clicking add friend
+    e.stopPropagation();
     if (onAddFriend) {
       onAddFriend();
-    }
-    // Send friend request to server
-    if (online?.sendFriendRequest) {
-      online.sendFriendRequest(user.username || user.id);
     }
   };
 
@@ -584,7 +534,12 @@ function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, onAdd
         <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{user.name}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{user.username || 'unknown'}</p>
       </div>
-      {!isFriend && onAddFriend && (
+      {!isFriend && isPending && (
+        <span className="ml-2 px-2 py-1 rounded-lg text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 flex-shrink-0">
+          Pending
+        </span>
+      )}
+      {!isFriend && !isPending && onAddFriend && (
         <button
           onClick={handleSendRequest}
           title="Send friend request"

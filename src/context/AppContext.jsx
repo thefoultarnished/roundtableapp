@@ -149,6 +149,11 @@ const initialState = {
 
   // Notifications queue
   notifications: [],
+
+  // Friends system
+  friends: [],
+  sentFriendRequests: [],
+  pendingFriendRequests: [],
 };
 
 function appReducer(state, action) {
@@ -174,7 +179,10 @@ function appReducer(state, action) {
         activeChatUserId: null,
         allUsers: [],
         displayedUsers: [],
-        messages: {}
+        messages: {},
+        friends: [],
+        sentFriendRequests: [],
+        pendingFriendRequests: [],
       };
     }
 
@@ -319,6 +327,41 @@ function appReducer(state, action) {
 
     case 'REMOVE_NOTIFICATION':
       return { ...state, notifications: state.notifications.filter(n => n.id !== action.payload) };
+
+    // Friends system
+    case 'SET_FRIENDS':
+      return { ...state, friends: action.payload };
+
+    case 'ADD_FRIEND': {
+      const friendId = action.payload;
+      if (state.friends.includes(friendId)) return state;
+      return { ...state, friends: [...state.friends, friendId] };
+    }
+
+    case 'SET_PENDING_REQUESTS':
+      return { ...state, pendingFriendRequests: action.payload };
+
+    case 'ADD_PENDING_REQUEST': {
+      const req = action.payload;
+      const exists = state.pendingFriendRequests.some(r => r.sender_id === req.sender_id);
+      if (exists) return state;
+      return { ...state, pendingFriendRequests: [...state.pendingFriendRequests, req] };
+    }
+
+    case 'REMOVE_PENDING_REQUEST':
+      return { ...state, pendingFriendRequests: state.pendingFriendRequests.filter(r => r.sender_id !== action.payload) };
+
+    case 'SET_SENT_REQUESTS':
+      return { ...state, sentFriendRequests: action.payload };
+
+    case 'ADD_SENT_REQUEST': {
+      const target = action.payload;
+      if (state.sentFriendRequests.includes(target)) return state;
+      return { ...state, sentFriendRequests: [...state.sentFriendRequests, target] };
+    }
+
+    case 'REMOVE_SENT_REQUEST':
+      return { ...state, sentFriendRequests: state.sentFriendRequests.filter(id => id !== action.payload) };
 
     case 'UPDATE_USER_STATUS': {
       const { userId, status } = action.payload;

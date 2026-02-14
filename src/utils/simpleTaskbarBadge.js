@@ -30,11 +30,21 @@ function createRedDot() {
  */
 export async function updateNotificationDot(show) {
   try {
-    const window = getCurrentWindow();
+    // Check if running in Tauri environment
+    if (!window.__TAURI__) {
+      // Not in Tauri, skip taskbar badge
+      return;
+    }
+
+    const tauriWindow = getCurrentWindow();
+    if (!tauriWindow || !tauriWindow.setOverlayIcon) {
+      // Window API not available
+      return;
+    }
 
     if (!show) {
       // Clear the overlay - no notifications
-      await window.setOverlayIcon(null);
+      await tauriWindow.setOverlayIcon(null);
       console.log('Notification dot cleared');
     } else {
       // Show red dot - there are unread messages
@@ -48,11 +58,12 @@ export async function updateNotificationDot(show) {
       }
 
       const image = await Image.fromBytes(bytes);
-      await window.setOverlayIcon(image);
+      await tauriWindow.setOverlayIcon(image);
       console.log('Notification dot shown');
     }
   } catch (error) {
-    console.error('Failed to update notification dot:', error);
+    // Silently fail - taskbar badge is not critical
+    console.debug('Taskbar badge not available:', error.message);
   }
 }
 
