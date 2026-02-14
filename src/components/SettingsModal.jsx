@@ -66,6 +66,12 @@ export default function SettingsModal() {
       localStorage.setItem('windowOpacity', windowOpacity);
       localStorage.setItem('theme', theme);
 
+      // Update AppContext currentUser
+      dispatch({
+        type: 'LOGIN',
+        payload: { username, displayName }
+      });
+
       // Apply Visual CSS Variables
       document.documentElement.style.setProperty('--app-font', appFont);
       document.documentElement.style.setProperty('--chat-font', chatFont);

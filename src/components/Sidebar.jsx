@@ -157,7 +157,7 @@ export default function Sidebar() {
 
       {/* Search — Glass input */}
       <div className="px-3 py-2 flex-shrink-0">
-        <div className={`relative rounded-xl transition-all duration-400 ${searchFocused ? 'ring-2 ring-teal-500/30 shadow-lg shadow-teal-500/10' : ''}`}>
+        <div className={`relative transition-all duration-400 ${searchFocused ? '' : ''}`}>
           <svg className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none transition-colors duration-300 ${searchFocused ? 'text-teal-400' : 'text-slate-400'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -428,7 +428,9 @@ export default function Sidebar() {
                       {user?.profile_picture ? (
                         <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover" alt={user?.name} />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700"></div>
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm">
+                          {user?.name?.charAt(0).toUpperCase() || '?'}
+                        </div>
                       )}
                     </div>
                     <div className="flex-grow min-w-0">
@@ -465,7 +467,8 @@ function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername, isPe
   const avatarHtml = user.profile_picture
     ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
-      <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700 flex items-center justify-center shadow-lg ring-2 ring-white/20">
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shadow-lg ring-2 ring-white/20">
+        {user.name?.charAt(0).toUpperCase() || '?'}
       </div>
     );
 
@@ -506,7 +509,8 @@ function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPen
   const avatarHtml = user.profile_picture
     ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
-      <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700 flex items-center justify-center shadow-lg ring-2 ring-white/20">
+      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shadow-lg ring-2 ring-white/20">
+        {user.name?.charAt(0).toUpperCase() || '?'}
       </div>
     );
 
