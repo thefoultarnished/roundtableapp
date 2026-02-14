@@ -5,15 +5,34 @@ export default function Sidebar() {
   const { state, dispatch, online } = useAppContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [friends, setFriends] = useState(() => {
+    const stored = localStorage.getItem('friends');
+    return stored ? JSON.parse(stored) : [];
+  });
 
   const onlineCount = state.allUsers.filter(u => u.status === 'online').length;
 
-  const filteredUsers = searchQuery
-    ? state.allUsers.filter(u =>
-        u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        u.ip?.includes(searchQuery)
-      )
-    : state.displayedUsers;
+  const addFriend = (userId) => {
+    if (!friends.includes(userId)) {
+      const newFriends = [...friends, userId];
+      setFriends(newFriends);
+      localStorage.setItem('friends', JSON.stringify(newFriends));
+    }
+  };
+
+  const searchResults = searchQuery
+    ? state.allUsers.filter(u => {
+        const isSelf = String(u.id).toLowerCase() === String(state.currentUser?.username).toLowerCase() ||
+                       String(u.username).toLowerCase() === String(state.currentUser?.username).toLowerCase();
+        return !isSelf && (u.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          u.name?.toLowerCase().includes(searchQuery.toLowerCase()));
+      })
+    : [];
+
+  const friendMatches = searchResults.filter(u => friends.includes(u.id || u.username));
+  const userMatches = searchResults.filter(u => !friends.includes(u.id || u.username));
+
+  const filteredUsers = !searchQuery ? state.displayedUsers : [];
 
   const handleUserClick = useCallback((userId) => {
     console.log(`👤 User clicked: ${userId}`);
@@ -47,7 +66,11 @@ export default function Sidebar() {
 
   const displayName = localStorage.getItem('displayName') || 'New User';
   const username = localStorage.getItem('username') || 'anonymous';
-  const profilePicture = localStorage.getItem('profilePicture');
+  const currentUsername = state.currentUser?.username || localStorage.getItem('username');
+
+  // Get profile picture mapped to current username
+  const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
+  const profilePicture = allProfilePics[currentUsername];
 
   return (
     <aside
@@ -185,11 +208,56 @@ export default function Sidebar() {
         {/* Show users only if logged in */}
         {state.currentUser && (
         <>
+        {/* Search Results */}
+        {searchQuery && (
+          <>
+            {/* Friends Matches */}
+            {friendMatches.length > 0 && (
+              <div className="space-y-1">
+                <div className="px-3 py-1 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(217,119,6,0.5)]"></span>
+                  <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Friends</h3>
+                  <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{friendMatches.length}</span>
+                </div>
+                {friendMatches.map((user, index) => (
+                  <UserItem key={user.id} user={user} index={index} isActive={user.id === state.activeChatUserId} unreadCount={state.unreadCounts[user.id] || 0} onClick={() => dispatch({ type: 'SET_ACTIVE_CHAT', payload: user.id })} showAddFriend={false} />
+                ))}
+              </div>
+            )}
+
+            {/* Users Matches */}
+            {userMatches.length > 0 && (
+              <div className="space-y-1">
+                <div className="px-3 py-1 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]"></span>
+                  <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Users</h3>
+                  <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{userMatches.length}</span>
+                </div>
+                {userMatches.map((user, index) => (
+                  <UserItemWithAddFriend key={user.id} user={user} index={index} onAddFriend={() => addFriend(user.id || user.username)} />
+                ))}
+              </div>
+            )}
+
+            {searchResults.length === 0 && (
+              <div className="text-center py-6">
+                <p className="text-xs text-slate-400">No users found</p>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Online Section */}
-        {(() => {
+        {!searchQuery && (() => {
           const onlineUsers = state.allUsers
-            .filter(u => u.status === 'online')
-            .filter(u => !searchQuery || u.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(u => {
+              // Exclude current user by checking multiple fields
+              const isSelf = String(u.id).toLowerCase() === String(currentUsername).toLowerCase() ||
+                             String(u.username).toLowerCase() === String(currentUsername).toLowerCase() ||
+                             String(u.info?.username).toLowerCase() === String(currentUsername).toLowerCase();
+              return u.status === 'online' && !isSelf;
+            })
+            .filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()))
             .sort((a, b) => {
               const lastA = state.messages[a.id]?.at(-1)?.timestamp || 0;
               const lastB = state.messages[b.id]?.at(-1)?.timestamp || 0;
@@ -220,10 +288,16 @@ export default function Sidebar() {
         })()}
 
         {/* Offline Section */}
-        {(() => {
+        {!searchQuery && (() => {
           const offlineUsers = state.allUsers
-            .filter(u => u.status !== 'online')
-            .filter(u => !searchQuery || u.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            .filter(u => {
+              // Exclude current user by checking multiple fields
+              const isSelf = String(u.id).toLowerCase() === String(currentUsername).toLowerCase() ||
+                             String(u.username).toLowerCase() === String(currentUsername).toLowerCase() ||
+                             String(u.info?.username).toLowerCase() === String(currentUsername).toLowerCase();
+              return u.status !== 'online' && !isSelf;
+            })
+            .filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()))
             .sort((a, b) => {
               const lastA = state.messages[a.id]?.at(-1)?.timestamp || 0;
               const lastB = state.messages[b.id]?.at(-1)?.timestamp || 0;
@@ -304,12 +378,46 @@ export default function Sidebar() {
   );
 }
 
+function UserItemWithAddFriend({ user, index, onAddFriend }) {
+  const avatarHtml = user.profile_picture
+    ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
+    : (
+      <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700 flex items-center justify-center shadow-lg ring-2 ring-white/20">
+      </div>
+    );
+
+  return (
+    <div className="flex items-center p-2.5 rounded-app hover:bg-white/20 dark:hover:bg-white/5 transition-all duration-300 group border border-white/10 hover:border-cyan-400/30">
+      <div className="relative mr-3 flex-shrink-0">
+        {avatarHtml}
+        <span className={`absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-white dark:border-slate-900 transition-all duration-500 ${
+          user.status === 'online'
+            ? 'bg-emerald-500 status-online-glow'
+            : 'bg-slate-400 dark:bg-slate-600'
+        }`} />
+      </div>
+      <div className="flex-grow overflow-hidden min-w-0">
+        <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{user.name}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{user.username || 'unknown'}</p>
+      </div>
+      <button
+        onClick={onAddFriend}
+        title="Add as friend"
+        className="ml-2 p-2 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-110 active:scale-95 flex-shrink-0"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function UserItem({ user, index, isActive, unreadCount, onClick }) {
   const avatarHtml = user.profile_picture
     ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
-      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${user.avatarGradient || 'from-teal-400 to-blue-500'} flex items-center justify-center font-bold text-white text-lg shadow-lg ring-2 ring-white/20`}>
-        {user.name?.charAt(0) || '?'}
+      <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700 flex items-center justify-center shadow-lg ring-2 ring-white/20">
       </div>
     );
 

@@ -166,6 +166,8 @@ function appReducer(state, action) {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('username');
       localStorage.removeItem('displayName');
+      localStorage.removeItem('profilePicture');
+      localStorage.removeItem('userId'); // Clear old random userId
       return {
         ...state,
         currentUser: null,

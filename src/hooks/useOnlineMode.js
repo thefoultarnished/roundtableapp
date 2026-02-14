@@ -208,14 +208,22 @@ export function useOnlineMode(dispatch, getState) {
 
             // Use Username as the primary unique ID if available, fallback to random userId
             const myUsername = localStorage.getItem('username');
-            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser'
-                ? myUsername
-                : String(localStorage.getItem('userId'));
+
+            // DON'T identify if not logged in (no username set)
+            if (!myUsername || myUsername === 'Anonymous' || myUsername === 'RoundtableUser') {
+                console.log('⏸️  Skipping identify - not logged in');
+                return;
+            }
+
+            const myId = myUsername;
 
             try {
                 const pubKeyJwk = await exportKey(keyPair.publicKey);
                 const name = localStorage.getItem('displayName') || myId;
-                const profilePicture = localStorage.getItem('profilePicture') || null;
+
+                // Get profile picture mapped to this user
+                const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
+                const profilePicture = allProfilePics[myId] || null;
 
                 console.log(`🔑 Identifying as [${myId}] on session [${clientSessionId.current}]`);
 
@@ -245,12 +253,16 @@ export function useOnlineMode(dispatch, getState) {
     const broadcastIdentity = useCallback(() => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && keyPair) {
             const myUsername = localStorage.getItem('username');
-            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser' 
-                ? myUsername 
-                : String(localStorage.getItem('userId')); 
-            
+            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser'
+                ? myUsername
+                : String(localStorage.getItem('userId'));
+
             exportKey(keyPair.publicKey).then(pubKeyJwk => {
                 const name = localStorage.getItem('displayName') || myId;
+
+                // Get profile picture mapped to this user
+                const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
+                const profilePicture = allProfilePics[myId] || null;
                 console.log(`📣 Broadcasting Identity manually as [${myId}]...`);
                 wsRef.current.send(JSON.stringify({
                     type: 'identify',

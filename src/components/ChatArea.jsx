@@ -555,8 +555,7 @@ export default function ChatArea() {
                   <img src={activeUser.profile_picture} className="w-full h-full object-cover" alt={activeUser.name} />
                 </div>
               ) : (
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0 bg-gradient-to-br ${activeUser?.avatarGradient || 'from-cyan-400 to-teal-500'} shadow-lg ring-2 ring-cyan-400/20 group-hover:ring-cyan-400/40 transition-all duration-300`}>
-                  {activeUser?.name?.charAt(0) || '?'}
+                <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0 bg-slate-600 shadow-lg ring-2 ring-cyan-400/20 group-hover:ring-cyan-400/40 transition-all duration-300">
                 </div>
               )}
               {/* Status indicator */}

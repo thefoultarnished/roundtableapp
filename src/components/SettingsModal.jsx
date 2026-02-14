@@ -24,13 +24,18 @@ export default function SettingsModal() {
     // Sync state from localStorage when settings are opened
     const syncSettings = () => {
       setDisplayName(localStorage.getItem('displayName') || 'Your Name');
-      setUsername(localStorage.getItem('username') || 'RoundtableUser');
+      const currentUsername = localStorage.getItem('username') || 'RoundtableUser';
+      setUsername(currentUsername);
       setAutoDownload(localStorage.getItem('autoDownloadFiles') === 'true');
       setAppFont(localStorage.getItem('appFont') || "'Inter', sans-serif");
       setChatFont(localStorage.getItem('chatFont') || "'Inter', sans-serif");
       setFontScale(parseInt(localStorage.getItem('fontSizeScale') || '100'));
       setTheme(localStorage.getItem('theme') || 'aurora');
-      setProfilePicture(localStorage.getItem('profilePicture') || '');
+
+      // Load profile picture mapped to current username
+      const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
+      setProfilePicture(allProfilePics[currentUsername] || '');
+
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
       setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
@@ -113,7 +118,15 @@ export default function SettingsModal() {
         canvas.getContext('2d').drawImage(img, 0, 0, 96, 96);
         const resized = canvas.toDataURL('image/png');
         setProfilePicture(resized);
-        localStorage.setItem('profilePicture', resized);
+
+        // Save to mapped object with username as key
+        const currentUsername = localStorage.getItem('username');
+        if (currentUsername) {
+          const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
+          allProfilePics[currentUsername] = resized;
+          localStorage.setItem('profilePictures', JSON.stringify(allProfilePics));
+        }
+
         announcePresence();
       };
       img.src = ev.target.result;
