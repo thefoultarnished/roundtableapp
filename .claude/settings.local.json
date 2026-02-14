@@ -6,7 +6,10 @@
       "Bash(gh pr create:*)",
       "Bash(npm install:*)",
       "Bash(npm start)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(pkill:*)",
+      "Bash(lsof:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }

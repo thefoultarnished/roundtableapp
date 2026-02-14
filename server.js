@@ -29,18 +29,77 @@ function verifyPassword(password, passwordHash) {
   return testHash === hash;
 }
 
-// Ensure password column exists
+// Create users table if it doesn't exist
 try {
   db.exec(`
-    ALTER TABLE users ADD COLUMN password_hash TEXT;
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT UNIQUE NOT NULL,
+      username TEXT,
+      display_name TEXT,
+      public_key TEXT,
+      profile_picture TEXT,
+      password_hash TEXT,
+      last_seen INTEGER,
+      created_at INTEGER
+    );
   `);
-  console.log("✅ Added password column to users table");
+  console.log("✅ Users table ready");
 } catch (err) {
-  if (err.message.includes("duplicate column") || err.message.includes("already exists")) {
-    console.log("📝 Password column already exists");
-  } else {
-    console.error("Error adding password column:", err.message);
-  }
+  console.error("Error creating users table:", err.message);
+}
+
+// Create messages table if it doesn't exist
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id TEXT UNIQUE,
+      sender_id TEXT,
+      recipient_id TEXT,
+      content TEXT,
+      timestamp INTEGER,
+      delivered INTEGER DEFAULT 0,
+      read_msg INTEGER DEFAULT 0
+    );
+  `);
+  console.log("✅ Messages table ready");
+} catch (err) {
+  console.error("Error creating messages table:", err.message);
+}
+
+// Create friend_requests table if it doesn't exist
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sender_id TEXT NOT NULL,
+      receiver_id TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      created_at INTEGER,
+      updated_at INTEGER,
+      UNIQUE(sender_id, receiver_id)
+    );
+  `);
+  console.log("✅ Friend requests table ready");
+} catch (err) {
+  console.error("Error creating friend_requests table:", err.message);
+}
+
+// Create friendships table to store accepted friendships
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS friendships (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      friend_id TEXT NOT NULL,
+      created_at INTEGER,
+      UNIQUE(user_id, friend_id)
+    );
+  `);
+  console.log("✅ Friendships table ready");
+} catch (err) {
+  console.error("Error creating friendships table:", err.message);
 }
 
 // Prepare statements for performance
@@ -89,6 +148,35 @@ const getChatHistory = db.prepare(`
   WHERE (sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?)
   ORDER BY timestamp DESC
   LIMIT ? OFFSET ?
+`);
+
+// Friend request statements
+const sendFriendRequest = db.prepare(`
+  INSERT INTO friend_requests (sender_id, receiver_id, status, created_at, updated_at)
+  VALUES (?, ?, 'pending', ?, ?)
+  ON CONFLICT(sender_id, receiver_id) DO UPDATE SET status = 'pending', updated_at = ?
+`);
+
+const getPendingFriendRequests = db.prepare(`
+  SELECT sender_id, receiver_id, created_at FROM friend_requests
+  WHERE receiver_id = ? AND status = 'pending'
+  ORDER BY created_at DESC
+`);
+
+const acceptFriendRequest = db.prepare(`
+  UPDATE friend_requests SET status = 'accepted', updated_at = ?
+  WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'
+`);
+
+const declineFriendRequest = db.prepare(`
+  UPDATE friend_requests SET status = 'declined', updated_at = ?
+  WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'
+`);
+
+const createFriendship = db.prepare(`
+  INSERT INTO friendships (user_id, friend_id, created_at)
+  VALUES (?, ?, ?)
+  ON CONFLICT(user_id, friend_id) DO NOTHING
 `);
 
 // Create HTTP server
@@ -178,6 +266,18 @@ function handleMessage(ws, data) {
       break;
     case "message_read":
       handleMessageRead(data);
+      break;
+    case "send_friend_request":
+      handleSendFriendRequest(ws, data);
+      break;
+    case "get_friend_requests":
+      handleGetFriendRequests(ws, data);
+      break;
+    case "accept_friend_request":
+      handleAcceptFriendRequest(ws, data);
+      break;
+    case "decline_friend_request":
+      handleDeclineFriendRequest(ws, data);
       break;
     default:
       console.log("Unknown message type:", data.type);
@@ -326,8 +426,8 @@ function handleIdentify(ws, data) {
       passwordHash = hashPassword(password);
     }
 
-    const username = info?.username || info?.name || userId;
-    const displayName = info?.name || info?.username || userId;
+    const username = (info?.username && info.username.trim()) ? info.username : (info?.name || userId);
+    const displayName = (info?.name && info.name.trim()) ? info.name : username;
     const publicKeyStr = JSON.stringify(publicKey);
     const profilePic = info?.profilePicture || null;
 
@@ -538,20 +638,23 @@ function broadcastUserList() {
   // Create a map of all users with their status
   const userMap = new Map();
 
-  // First, add all database users as offline
+  // First, add all database users as offline (skip those with no username)
   allDbUsers.forEach((dbUser) => {
-    userMap.set(dbUser.user_id, {
-      id: dbUser.user_id,
-      sessionId: null,
-      publicKey: JSON.parse(dbUser.public_key),
-      info: {
-        name: dbUser.display_name,
-        username: dbUser.username,
-        profilePicture: dbUser.profile_picture,
-      },
-      status: "offline",
-      lastSeen: dbUser.last_seen,
-    });
+    // Only include users that have a valid username (not null/empty)
+    if (dbUser.username && dbUser.username.trim()) {
+      userMap.set(dbUser.user_id, {
+        id: dbUser.user_id,
+        sessionId: null,
+        publicKey: JSON.parse(dbUser.public_key),
+        info: {
+          name: dbUser.display_name || dbUser.username, // Fallback to username if no display_name
+          username: dbUser.username,
+          profilePicture: dbUser.profile_picture,
+        },
+        status: "offline",
+        lastSeen: dbUser.last_seen,
+      });
+    }
   });
 
   // Then, update online users from connectedUsers
@@ -711,6 +814,98 @@ function handleMessageRead(data) {
   }
 }
 
+// Handle Send Friend Request
+function handleSendFriendRequest(ws, data) {
+  const { receiverUsername } = data;
+  if (!ws.userId || !receiverUsername) return;
+
+  try {
+    const now = Date.now();
+    sendFriendRequest.run(ws.userId, receiverUsername, now, now, now);
+    console.log(`📤 Friend request sent from ${ws.userId} to ${receiverUsername}`);
+
+    // Notify receiver if they're online
+    const receiver = Array.from(connectedUsers.values()).find(
+      u => u.info?.username === receiverUsername
+    );
+    if (receiver && receiver.socket.readyState === WebSocket.OPEN) {
+      receiver.socket.send(
+        JSON.stringify({
+          type: "friend_request_received",
+          senderId: ws.userId,
+          senderUsername: ws.userId, // Update this if you have username stored
+        })
+      );
+    }
+  } catch (err) {
+    console.error("Error sending friend request:", err.message);
+  }
+}
+
+// Handle Get Friend Requests
+function handleGetFriendRequests(ws, data) {
+  if (!ws.userId) return;
+
+  try {
+    const requests = getPendingFriendRequests.all(ws.userId);
+    console.log(`📥 Retrieved ${requests.length} pending requests for ${ws.userId}`);
+
+    ws.send(
+      JSON.stringify({
+        type: "friend_requests_list",
+        requests: requests,
+      })
+    );
+  } catch (err) {
+    console.error("Error getting friend requests:", err.message);
+  }
+}
+
+// Handle Accept Friend Request
+function handleAcceptFriendRequest(ws, data) {
+  const { senderId } = data;
+  if (!ws.userId || !senderId) return;
+
+  try {
+    const now = Date.now();
+    acceptFriendRequest.run(now, senderId, ws.userId);
+    // Create friendships in both directions
+    createFriendship.run(ws.userId, senderId, now);
+    createFriendship.run(senderId, ws.userId, now);
+    console.log(`✅ Friend request accepted: ${senderId} <-> ${ws.userId}`);
+
+    ws.send(
+      JSON.stringify({
+        type: "friend_request_accepted",
+        friendId: senderId,
+      })
+    );
+  } catch (err) {
+    console.error("Error accepting friend request:", err.message);
+  }
+}
+
+// Handle Decline Friend Request
+function handleDeclineFriendRequest(ws, data) {
+  const { senderId } = data;
+  if (!ws.userId || !senderId) return;
+
+  try {
+    const now = Date.now();
+    declineFriendRequest.run(now, senderId, ws.userId);
+    console.log(`❌ Friend request declined: ${senderId} -> ${ws.userId}`);
+
+    ws.send(
+      JSON.stringify({
+        type: "friend_request_declined",
+        friendId: senderId,
+      })
+    );
+  } catch (err) {
+    console.error("Error declining friend request:", err.message);
+  }
+}
+
 // Heartbeat to keep connections alive
 setInterval(() => {
   wss.clients.forEach((ws) => {
@@ -727,7 +922,7 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-server.listen(PORT, () => {
-  console.log(`✅ Server listening on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server listening on port ${PORT} (all interfaces)`);
   console.log(`📊 Database: ${DB_PATH}`);
 });

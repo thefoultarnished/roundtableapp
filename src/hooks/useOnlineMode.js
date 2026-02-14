@@ -573,10 +573,19 @@ export function useOnlineMode(dispatch, getState) {
                 break;
             }
 
+            case 'friend_request_received': {
+                console.log('🔔 Friend request received from:', data.senderId);
+                // Dispatch custom event to notify Sidebar to reload friend requests
+                window.dispatchEvent(new CustomEvent('friendRequestReceived', {
+                    detail: { senderId: data.senderId }
+                }));
+                break;
+            }
+
             case 'message':
                 console.log("Received Online Message:", data);
-                const { senderId, payload } = data; 
-                
+                const { senderId, payload } = data;
+
                 try {
                     let finalText = "";
 
@@ -584,7 +593,7 @@ export function useOnlineMode(dispatch, getState) {
                     if (payload.encrypted && payload.iv && payload.cipher) {
                         const safeSenderId = String(senderId);
                         let sharedKey = sharedKeys.current[safeSenderId];
-                        
+
                         // Try to derive key if missing
                         if (!sharedKey && userPublicKeys.current[safeSenderId] && keyPair) {
                              console.log(`Deriving shared key for sender ${safeSenderId}...`);
@@ -615,7 +624,7 @@ export function useOnlineMode(dispatch, getState) {
                     // Check if we know this user
                     const currentUserList = getState().allUsers;
                     const senderExists = currentUserList.find(u => u.id === safeSenderId);
-                    
+
                     if (!senderExists) {
                         dispatch({
                             type: 'ADD_USER',
@@ -829,5 +838,74 @@ export function useOnlineMode(dispatch, getState) {
         authPasswordRef.current = password;
     }, []);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword]);
+    const sendFriendRequest = useCallback((receiverUsername) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return;
+        }
+        wsRef.current.send(JSON.stringify({
+            type: 'send_friend_request',
+            receiverUsername: receiverUsername
+        }));
+    }, []);
+
+    const getFriendRequests = useCallback(() => {
+        return new Promise((resolve) => {
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+                console.error('WebSocket not connected');
+                resolve([]);
+                return;
+            }
+
+            const originalOnmessage = wsRef.current.onmessage;
+            const handler = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'friend_requests_list') {
+                        wsRef.current.onmessage = originalOnmessage;
+                        resolve(data.requests || []);
+                    }
+                } catch (e) {
+                    console.error('Error parsing friend requests:', e);
+                }
+            };
+
+            wsRef.current.onmessage = handler;
+            wsRef.current.send(JSON.stringify({
+                type: 'get_friend_requests'
+            }));
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+                if (wsRef.current && wsRef.current.onmessage === handler) {
+                    wsRef.current.onmessage = originalOnmessage;
+                    resolve([]);
+                }
+            }, 5000);
+        });
+    }, []);
+
+    const acceptFriendRequest = useCallback((senderId) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return;
+        }
+        wsRef.current.send(JSON.stringify({
+            type: 'accept_friend_request',
+            senderId: senderId
+        }));
+    }, []);
+
+    const declineFriendRequest = useCallback((senderId) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return;
+        }
+        wsRef.current.send(JSON.stringify({
+            type: 'decline_friend_request',
+            senderId: senderId
+        }));
+    }, []);
+
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, acceptFriendRequest, declineFriendRequest }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, acceptFriendRequest, declineFriendRequest]);
 }

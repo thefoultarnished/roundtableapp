@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export default function Sidebar() {
@@ -9,6 +9,38 @@ export default function Sidebar() {
     const stored = localStorage.getItem('friends');
     return stored ? JSON.parse(stored) : [];
   });
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [showRequests, setShowRequests] = useState(false);
+
+  // Load pending friend requests from server when user logs in
+  useEffect(() => {
+    if (!state.currentUser || !online) return;
+
+    const loadFriendRequests = () => {
+      if (online.getFriendRequests) {
+        online.getFriendRequests().then(requests => {
+          if (requests) {
+            setPendingRequests(requests);
+          }
+        });
+      }
+    };
+
+    // Initial load
+    loadFriendRequests();
+
+    // Listen for incoming friend requests
+    const handleFriendRequestReceived = (event) => {
+      console.log('🔔 Reloading friend requests after notification');
+      loadFriendRequests();
+    };
+
+    window.addEventListener('friendRequestReceived', handleFriendRequestReceived);
+
+    return () => {
+      window.removeEventListener('friendRequestReceived', handleFriendRequestReceived);
+    };
+  }, [state.currentUser, online]);
 
   const onlineCount = state.allUsers.filter(u => u.status === 'online').length;
 
@@ -18,6 +50,28 @@ export default function Sidebar() {
       setFriends(newFriends);
       localStorage.setItem('friends', JSON.stringify(newFriends));
     }
+  };
+
+  const acceptFriendRequest = (senderId) => {
+    // Send to server
+    if (online?.acceptFriendRequest) {
+      online.acceptFriendRequest(senderId);
+    }
+    // Update local state
+    const updated = pendingRequests.filter(r => r.sender_id !== senderId && r !== senderId);
+    setPendingRequests(updated);
+    // Add to friends
+    addFriend(senderId);
+  };
+
+  const declineFriendRequest = (senderId) => {
+    // Send to server
+    if (online?.declineFriendRequest) {
+      online.declineFriendRequest(senderId);
+    }
+    // Update local state
+    const updated = pendingRequests.filter(r => r.sender_id !== senderId && r !== senderId);
+    setPendingRequests(updated);
   };
 
   const searchResults = searchQuery
@@ -54,15 +108,6 @@ export default function Sidebar() {
     }
   }, [dispatch, online]);
 
-  const handleRefresh = useCallback(() => {
-    if (state.globalInvokeFunc) {
-      state.globalInvokeFunc('broadcast_discovery_query');
-    }
-    // Also trigger online identity broadcast
-    if (online?.broadcastIdentity) {
-      online.broadcastIdentity();
-    }
-  }, [state.globalInvokeFunc, online]);
 
   const displayName = localStorage.getItem('displayName') || 'New User';
   const username = localStorage.getItem('username') || 'anonymous';
@@ -169,14 +214,20 @@ export default function Sidebar() {
             className="w-full pl-10 pr-10 py-2 rounded-app bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/10 focus:border-teal-500/50 outline-none transition-all duration-300 placeholder-slate-400/70 text-sm text-slate-800 dark:text-slate-200 backdrop-blur-sm"
           />
           <button
-            id="refresh-users"
-            onClick={handleRefresh}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-slate-400 hover:text-teal-400 hover:bg-teal-500/10 transition-all duration-300 hover:rotate-180"
-            title="Refresh user list"
+            onClick={() => setShowRequests(!showRequests)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300"
+            title="Friend requests"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <div className="relative">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {pendingRequests.length > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </div>
           </button>
         </div>
       </div>
@@ -220,7 +271,7 @@ export default function Sidebar() {
                   <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{friendMatches.length}</span>
                 </div>
                 {friendMatches.map((user, index) => (
-                  <UserItem key={user.id} user={user} index={index} isActive={user.id === state.activeChatUserId} unreadCount={state.unreadCounts[user.id] || 0} onClick={() => dispatch({ type: 'SET_ACTIVE_CHAT', payload: user.id })} showAddFriend={false} />
+                  <UserItem key={user.id} user={user} index={index} isActive={user.id === state.activeChatUserId} unreadCount={state.unreadCounts[user.id] || 0} onClick={() => handleUserClick(user.id)} isFriend={true} />
                 ))}
               </div>
             )}
@@ -234,7 +285,7 @@ export default function Sidebar() {
                   <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{userMatches.length}</span>
                 </div>
                 {userMatches.map((user, index) => (
-                  <UserItemWithAddFriend key={user.id} user={user} index={index} onAddFriend={() => addFriend(user.id || user.username)} />
+                  <UserItemWithAddFriend key={user.id} user={user} index={index} currentUsername={currentUsername} onAddFriend={() => addFriend(user.id || user.username)} />
                 ))}
               </div>
             )}
@@ -281,6 +332,8 @@ export default function Sidebar() {
                   isActive={user.id === state.activeChatUserId}
                   unreadCount={state.unreadCounts[user.id] || 0}
                   onClick={() => handleUserClick(user.id)}
+                  isFriend={friends.includes(user.id || user.username)}
+                  onAddFriend={() => addFriend(user.id || user.username)}
                 />
               ))}
             </div>
@@ -321,6 +374,8 @@ export default function Sidebar() {
                   isActive={user.id === state.activeChatUserId}
                   unreadCount={state.unreadCounts[user.id] || 0}
                   onClick={() => handleUserClick(user.id)}
+                  isFriend={friends.includes(user.id || user.username)}
+                  onAddFriend={() => addFriend(user.id || user.username)}
                 />
               ))}
             </div>
@@ -329,6 +384,69 @@ export default function Sidebar() {
         </>
         )}
       </div>
+
+      {/* Friend Requests Modal */}
+      {showRequests && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 modal-backdrop" onClick={() => setShowRequests(false)}>
+          <div className="glass-panel-heavy rounded-3xl w-full max-w-md flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="py-4 px-5 border-b border-white/20 flex justify-between items-center">
+              <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-sm">🔔</span>
+                Friend Requests
+              </h2>
+              <button onClick={() => setShowRequests(false)} className="text-slate-400 hover:text-slate-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 flex-grow overflow-y-auto space-y-3 max-h-96">
+              {pendingRequests.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-slate-400">No pending requests</p>
+                </div>
+              ) : (
+                pendingRequests.map((request) => {
+                  const senderId = request.sender_id;
+                  const user = state.allUsers.find(u => u.id === senderId || u.username === senderId);
+                  return (
+                    <div key={senderId} className="flex items-center gap-3 p-3 rounded-lg bg-white/10 border border-white/10 hover:bg-white/15 transition-all">
+                      <div className="flex-shrink-0">
+                        {user?.profile_picture ? (
+                          <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover" alt={user?.name} />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700"></div>
+                        )}
+                      </div>
+                      <div className="flex-grow min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{user?.name || senderId}</p>
+                        <p className="text-xs text-slate-500">@{user?.username || senderId}</p>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => acceptFriendRequest(senderId)}
+                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          onClick={() => declineFriendRequest(senderId)}
+                          className="px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-slate-300 text-xs font-semibold hover:bg-white/20 transition-all active:scale-95"
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Profile footer — Glass card */}
       <div className="p-3 mt-auto border-t border-white/10 dark:border-white/5">
@@ -378,13 +496,23 @@ export default function Sidebar() {
   );
 }
 
-function UserItemWithAddFriend({ user, index, onAddFriend }) {
+function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername }) {
+  const { state, online } = useAppContext();
   const avatarHtml = user.profile_picture
     ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
       <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700 flex items-center justify-center shadow-lg ring-2 ring-white/20">
       </div>
     );
+
+  const handleSendRequest = () => {
+    onAddFriend();
+
+    // Send friend request to server
+    if (online?.sendFriendRequest) {
+      online.sendFriendRequest(user.username);
+    }
+  };
 
   return (
     <div className="flex items-center p-2.5 rounded-app hover:bg-white/20 dark:hover:bg-white/5 transition-all duration-300 group border border-white/10 hover:border-cyan-400/30">
@@ -401,8 +529,8 @@ function UserItemWithAddFriend({ user, index, onAddFriend }) {
         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{user.username || 'unknown'}</p>
       </div>
       <button
-        onClick={onAddFriend}
-        title="Add as friend"
+        onClick={handleSendRequest}
+        title="Send friend request"
         className="ml-2 p-2 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-110 active:scale-95 flex-shrink-0"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -413,13 +541,25 @@ function UserItemWithAddFriend({ user, index, onAddFriend }) {
   );
 }
 
-function UserItem({ user, index, isActive, unreadCount, onClick }) {
+function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, onAddFriend }) {
+  const { online } = useAppContext();
   const avatarHtml = user.profile_picture
     ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
       <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700 flex items-center justify-center shadow-lg ring-2 ring-white/20">
       </div>
     );
+
+  const handleSendRequest = (e) => {
+    e.stopPropagation(); // Prevent opening chat when clicking add friend
+    if (onAddFriend) {
+      onAddFriend();
+    }
+    // Send friend request to server
+    if (online?.sendFriendRequest) {
+      online.sendFriendRequest(user.username || user.id);
+    }
+  };
 
   return (
     <div
@@ -444,6 +584,17 @@ function UserItem({ user, index, isActive, unreadCount, onClick }) {
         <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{user.name}</p>
         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{user.username || 'unknown'}</p>
       </div>
+      {!isFriend && onAddFriend && (
+        <button
+          onClick={handleSendRequest}
+          title="Send friend request"
+          className="ml-2 p-2 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300 hover:scale-110 active:scale-95 flex-shrink-0"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      )}
       {unreadCount > 0 && (
         <div className="unread-badge ml-auto px-2.5 py-0.5 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full shadow-lg shadow-red-500/20 min-w-[1.5rem] flex items-center justify-center">
           {unreadCount > 99 ? '99+' : unreadCount}
