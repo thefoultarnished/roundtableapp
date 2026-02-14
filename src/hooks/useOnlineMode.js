@@ -690,6 +690,24 @@ export function useOnlineMode(dispatch, getState) {
                 break;
             }
 
+            case 'signup_success': {
+                console.log('✅ Signup successful:', data.username);
+                // Dispatch a custom event that ChatArea can listen to
+                window.dispatchEvent(new CustomEvent('signup_success', {
+                    detail: { username: data.username, message: data.message }
+                }));
+                break;
+            }
+
+            case 'signup_failed': {
+                console.log('❌ Signup failed:', data.reason);
+                // Dispatch a custom event that ChatArea can listen to
+                window.dispatchEvent(new CustomEvent('signup_failed', {
+                    detail: { reason: data.reason }
+                }));
+                break;
+            }
+
             case 'registered': {
                 console.log('✅ Registered with server, syncing friend data...');
 

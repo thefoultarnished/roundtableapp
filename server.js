@@ -597,24 +597,60 @@ function handleIdentify(ws, data) {
       console.log(`✅ User ${userId} updated in database`);
     } else {
       // New user - insert with password if provided
-      const insertStmt = db.prepare(`
-        INSERT INTO users (user_id, username, display_name, public_key, profile_picture, password_hash, last_seen, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      insertStmt.run(
-        userId,
-        username,
-        displayName,
-        publicKeyStr,
-        profilePic,
-        passwordHash,
-        now,
-        now,
-      );
-      console.log(`✅ New user ${userId} created in database`);
+      try {
+        const insertStmt = db.prepare(`
+          INSERT INTO users (user_id, username, display_name, public_key, profile_picture, password_hash, last_seen, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        insertStmt.run(
+          userId,
+          username,
+          displayName,
+          publicKeyStr,
+          profilePic,
+          passwordHash,
+          now,
+          now,
+        );
+        console.log(`✅ New user ${userId} created in database`);
+
+        // Send signup success confirmation if this was a signup (password provided)
+        if (password) {
+          ws.send(
+            JSON.stringify({
+              type: "signup_success",
+              username: username,
+              message: "Account created successfully",
+            }),
+          );
+          console.log(`📤 Sent signup_success to ${username}`);
+        }
+      } catch (insertErr) {
+        console.error(`❌ Failed to insert user ${userId}:`, insertErr);
+        // Send signup failure if this was a signup attempt
+        if (password) {
+          ws.send(
+            JSON.stringify({
+              type: "signup_failed",
+              reason: "Failed to create account. Please try again.",
+            }),
+          );
+        }
+        return; // Don't proceed with connection if signup failed
+      }
     }
   } catch (err) {
     console.error("Failed to save user to database:", err);
+    // Send failure message if password was provided (signup attempt)
+    if (password) {
+      ws.send(
+        JSON.stringify({
+          type: "signup_failed",
+          reason: "Database error occurred",
+        }),
+      );
+    }
+    return;
   }
 
   // De-duplicate sessions

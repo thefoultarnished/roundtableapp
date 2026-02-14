@@ -24,12 +24,51 @@ export default function ChatArea() {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [authSuccess, setAuthSuccess] = useState('');
 
   useEffect(() => {
     if (searchActive && searchInputRef.current) {
       searchInputRef.current.focus();
     }
   }, [searchActive]);
+
+  // Listen for signup success/failure events
+  useEffect(() => {
+    const handleSignupSuccess = (event) => {
+      console.log('✅ Signup success event received:', event.detail);
+      setAuthLoading(false);
+      setAuthSuccess('✅ Signup successful! Please login.');
+      setAuthError('');
+      // Clear form
+      setAuthUsername('');
+      setAuthPassword('');
+      setAuthDisplayName('');
+      // Switch to login mode
+      setTimeout(() => {
+        setAuthMode('login');
+        setAuthSuccess('');
+      }, 2000);
+    };
+
+    const handleSignupFailure = (event) => {
+      console.log('❌ Signup failure event received:', event.detail);
+      setAuthLoading(false);
+      setAuthError(event.detail.reason || 'Signup failed');
+      setAuthSuccess('');
+      // Clear temporary storage on failure
+      localStorage.removeItem('username');
+      localStorage.removeItem('displayName');
+      localStorage.removeItem('authPassword');
+    };
+
+    window.addEventListener('signup_success', handleSignupSuccess);
+    window.addEventListener('signup_failed', handleSignupFailure);
+
+    return () => {
+      window.removeEventListener('signup_success', handleSignupSuccess);
+      window.removeEventListener('signup_failed', handleSignupFailure);
+    };
+  }, []);
 
   const activeUser = state.allUsers.find(u => u.id === state.activeChatUserId);
   const userMessages = state.activeChatUserId ? (state.messages[state.activeChatUserId] || []) : [];
@@ -263,6 +302,8 @@ export default function ChatArea() {
                   }
 
                   setAuthLoading(true);
+                  setAuthError('');
+                  setAuthSuccess('');
 
                   try {
                     // Validate with server
@@ -274,40 +315,63 @@ export default function ChatArea() {
                       return;
                     }
 
-                    // Store password in localStorage for session persistence
-                    localStorage.setItem('authPassword', authPassword);
+                    if (authMode === 'signup') {
+                      // SIGNUP FLOW: Don't auto-login, wait for server confirmation
+                      console.log(`📝 Signup initiated for: ${authUsername.trim()}`);
 
-                    // Also set password temporarily for immediate use
-                    if (online?.setAuthPassword) {
-                      online.setAuthPassword(authPassword);
+                      // Store username and password for identify
+                      localStorage.setItem('username', authUsername.trim());
+                      localStorage.setItem('displayName', authDisplayName.trim());
+
+                      // Store password temporarily for identify
+                      if (online?.setAuthPassword) {
+                        online.setAuthPassword(authPassword);
+                      }
+
+                      // Send identify with password - server will create user and respond
+                      setTimeout(() => {
+                        if (online?.sendIdentifyWithPassword) {
+                          online.sendIdentifyWithPassword();
+                        }
+                      }, 100);
+
+                      // Keep loading state - will be cleared by signup_success/failure handler
+                      // Don't clear form yet - wait for confirmation
+                    } else {
+                      // LOGIN FLOW: Proceed normally
+                      console.log(`🔑 Login initiated for: ${authUsername.trim()}`);
+
+                      // Store password in localStorage for session persistence
+                      localStorage.setItem('authPassword', authPassword);
+
+                      // Set password for identify
+                      if (online?.setAuthPassword) {
+                        online.setAuthPassword(authPassword);
+                      }
+
+                      dispatch({
+                        type: 'LOGIN',
+                        payload: {
+                          username: authUsername.trim(),
+                          displayName: authUsername.trim()
+                        }
+                      });
+
+                      // Send identify with password
+                      setTimeout(() => {
+                        if (online?.sendIdentifyWithPassword) {
+                          online.sendIdentifyWithPassword();
+                        }
+                      }, 100);
+
+                      setAuthMode(null);
+                      setAuthUsername('');
+                      setAuthPassword('');
+                      setAuthLoading(false);
                     }
-
-                    // Username is now the unique ID - no need for separate userId storage
-                    console.log(`✅ Using username as unique ID: ${validation.username}`);
-
-                    dispatch({
-                      type: 'LOGIN',
-                      payload: {
-                        username: authUsername.trim(),
-                        displayName: authMode === 'signup' ? authDisplayName.trim() : authUsername.trim()
-                      }
-                    });
-
-                    // Send identify with password for signup
-                    setTimeout(() => {
-                      if (online?.sendIdentifyWithPassword) {
-                        online.sendIdentifyWithPassword();
-                      }
-                    }, 100);
-
-                    setAuthMode(null);
-                    setAuthUsername('');
-                    setAuthDisplayName('');
-                    setAuthPassword('');
                   } catch (err) {
                     setAuthError('Error during authentication');
                     console.error('Auth validation error:', err);
-                  } finally {
                     setAuthLoading(false);
                   }
                 }} className="space-y-3">
@@ -365,6 +429,9 @@ export default function ChatArea() {
                   )}
                   {authError && (
                     <p className="text-xs text-red-300/80 font-semibold">{authError}</p>
+                  )}
+                  {authSuccess && (
+                    <p className="text-xs text-green-400 font-semibold">{authSuccess}</p>
                   )}
 
                   {/* Submit Button */}
