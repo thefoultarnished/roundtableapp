@@ -496,6 +496,11 @@ export default function SettingsModal() {
             {/* Logout Button */}
             <button
               onClick={() => {
+                // Tell server to disconnect this user first
+                if (online?.sendLogout) {
+                  online.sendLogout();
+                }
+                // Then clear local state
                 dispatch({ type: 'LOGOUT' });
                 closeSettings();
               }}

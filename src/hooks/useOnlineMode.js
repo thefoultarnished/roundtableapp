@@ -1085,5 +1085,24 @@ export function useOnlineMode(dispatch, getState) {
         console.log(`📸 Sent profile picture update to server`);
     }, []);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate }), [connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate]);
+    const sendLogout = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.warn('⚠️ Not connected to server, but proceeding with logout');
+            return;
+        }
+
+        const userId = localStorage.getItem('username');
+        if (!userId) {
+            console.warn('❌ No user ID found for logout');
+            return;
+        }
+
+        wsRef.current.send(JSON.stringify({
+            type: 'user_logout',
+            userId: userId
+        }));
+        console.log(`👋 Sent logout message to server for user: ${userId}`);
+    }, []);
+
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate, sendLogout }), [connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate, sendLogout]);
 }

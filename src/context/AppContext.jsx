@@ -182,6 +182,8 @@ function appReducer(state, action) {
     }
 
     case 'LOGOUT': {
+      // Note: sendLogout should be called from component, not here
+      // This action just clears local state
       localStorage.removeItem('currentUser');
       localStorage.removeItem('username');
       localStorage.removeItem('displayName');

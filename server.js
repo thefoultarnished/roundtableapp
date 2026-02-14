@@ -394,6 +394,9 @@ function handleMessage(ws, data) {
     case "update_profile_picture":
       handleUpdateProfilePicture(ws, data);
       break;
+    case "user_logout":
+      handleUserLogout(ws, data);
+      break;
     default:
       console.log("Unknown message type:", data.type);
   }
@@ -1304,6 +1307,33 @@ function handleUpdateUsername(ws, data) {
         reason: "Database error",
       }),
     );
+  }
+}
+
+// Handle User Logout
+function handleUserLogout(ws, data) {
+  const { userId } = data;
+  if (!userId) return;
+
+  try {
+    // Remove user from connected users
+    if (connectedUsers.has(userId)) {
+      console.log(`🔌 User ${userId} explicitly logged out`);
+
+      // Update last_seen in database
+      const now = Date.now();
+      updateUserLastSeen.run(now, userId, userId);
+
+      // Remove from connected users
+      connectedUsers.delete(userId);
+
+      // Broadcast updated user list to all clients
+      broadcastUserList();
+
+      console.log(`✅ User ${userId} disconnected from server`);
+    }
+  } catch (err) {
+    console.error("Failed to handle logout:", err);
   }
 }
 
