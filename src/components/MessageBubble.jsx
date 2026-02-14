@@ -45,8 +45,8 @@ function MessageBubble({ message }) {
     isSentByMe ? null : state.allUsers.find(u => u.id === message.sender),
     [isSentByMe, message.sender, state.allUsers]
   );
-  // Get current user's profile picture from Redux state
-  const currentUserData = isSentByMe ? state.allUsers.find(u => u.username === state.currentUser) : null;
+  // Get current user's profile picture from Redux state (same as settings area)
+  const currentUserData = isSentByMe ? state.allUsers.find(u => u.username === state.currentUser?.username) : null;
   const myProfilePicture = currentUserData?.profile_picture || null;
 
   if (isSentByMe && !myProfilePicture) {
