@@ -259,11 +259,13 @@ export default function Sidebar() {
         {!searchQuery && (() => {
           const onlineUsers = state.allUsers
             .filter(u => {
+              // Only show friends
+              const isFriend = friends.includes(u.id) || friends.includes(u.username);
               // Exclude current user by checking multiple fields
               const isSelf = String(u.id).toLowerCase() === String(currentUsername).toLowerCase() ||
                              String(u.username).toLowerCase() === String(currentUsername).toLowerCase() ||
                              String(u.info?.username).toLowerCase() === String(currentUsername).toLowerCase();
-              return u.status === 'online' && !isSelf;
+              return isFriend && u.status === 'online' && !isSelf;
             })
             .filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()))
             .sort((a, b) => {
@@ -302,11 +304,13 @@ export default function Sidebar() {
         {!searchQuery && (() => {
           const offlineUsers = state.allUsers
             .filter(u => {
+              // Only show friends
+              const isFriend = friends.includes(u.id) || friends.includes(u.username);
               // Exclude current user by checking multiple fields
               const isSelf = String(u.id).toLowerCase() === String(currentUsername).toLowerCase() ||
                              String(u.username).toLowerCase() === String(currentUsername).toLowerCase() ||
                              String(u.info?.username).toLowerCase() === String(currentUsername).toLowerCase();
-              return u.status !== 'online' && !isSelf;
+              return isFriend && u.status !== 'online' && !isSelf;
             })
             .filter(u => !searchQuery || u.name?.toLowerCase().includes(searchQuery.toLowerCase()))
             .sort((a, b) => {
