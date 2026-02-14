@@ -750,6 +750,23 @@ export function useOnlineMode(dispatch, getState) {
                     console.error('Message handling failed', e);
                 }
                 break;
+
+            case 'profile_picture_updated': {
+                console.log('📸 Profile picture update received:', data);
+                const { userId, profilePicture } = data;
+
+                // Update the user's profile picture in the app state
+                dispatch({
+                    type: 'UPDATE_USER_PROFILE_PICTURE',
+                    payload: {
+                        userId: userId,
+                        profilePicture: profilePicture
+                    }
+                });
+
+                console.log(`✅ Updated profile picture for user ${userId}`);
+                break;
+            }
         }
     };
 
@@ -976,5 +993,25 @@ export function useOnlineMode(dispatch, getState) {
         }));
     }, []);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest]);
+    const sendProfilePictureUpdate = useCallback((profilePicture) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.warn('❌ Cannot send profile picture update: Not connected to server');
+            return;
+        }
+
+        const userId = localStorage.getItem('appUserId');
+        if (!userId) {
+            console.warn('❌ No user ID found');
+            return;
+        }
+
+        wsRef.current.send(JSON.stringify({
+            type: 'update_profile_picture',
+            userId: userId,
+            profilePicture: profilePicture
+        }));
+        console.log(`📸 Sent profile picture update to server`);
+    }, []);
+
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate]);
 }

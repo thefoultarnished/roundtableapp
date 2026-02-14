@@ -373,6 +373,14 @@ function appReducer(state, action) {
       return { ...state, allUsers: updatedUsers, displayedUsers: updatedUsers };
     }
 
+    case 'UPDATE_USER_PROFILE_PICTURE': {
+      const { userId, profilePicture } = action.payload;
+      const updatedUsers = state.allUsers.map(u =>
+        u.id === userId ? { ...u, profile_picture: profilePicture } : u
+      );
+      return { ...state, allUsers: updatedUsers, displayedUsers: updatedUsers };
+    }
+
     default:
       return state;
   }

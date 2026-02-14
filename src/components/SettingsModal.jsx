@@ -153,6 +153,11 @@ export default function SettingsModal() {
           localStorage.setItem('profilePictures', JSON.stringify(allProfilePics));
         }
 
+        // Broadcast profile picture update to server if in online mode
+        if (online?.sendProfilePictureUpdate) {
+          online.sendProfilePictureUpdate(resized);
+        }
+
         announcePresence();
       };
       img.src = ev.target.result;

@@ -298,6 +298,9 @@ function handleMessage(ws, data) {
     case "update_username":
       handleUpdateUsername(ws, data);
       break;
+    case "update_profile_picture":
+      handleUpdateProfilePicture(ws, data);
+      break;
     default:
       console.log("Unknown message type:", data.type);
   }
@@ -1099,6 +1102,70 @@ function handleUpdateUsername(ws, data) {
       JSON.stringify({
         type: 'username_updated',
         success: false,
+        reason: 'Database error'
+      })
+    );
+  }
+}
+
+// Handle Update Profile Picture
+function handleUpdateProfilePicture(ws, data) {
+  const { userId, profilePicture } = data;
+  if (!userId || !profilePicture) return;
+
+  try {
+    // Update user's profile picture in database
+    const updateStmt = db.prepare(`
+      UPDATE users SET profile_picture = ? WHERE user_id = ?
+    `);
+    const result = updateStmt.run(profilePicture, userId);
+
+    if (result.changes > 0) {
+      console.log(`📸 Profile picture updated for user ${userId}`);
+
+      // Update the in-memory connectedUsers
+      const user = connectedUsers.get(userId);
+      if (user) {
+        user.info = { ...user.info, profilePicture: profilePicture };
+      }
+
+      // Broadcast the profile picture update to ALL connected users
+      const broadcastData = JSON.stringify({
+        type: "profile_picture_updated",
+        userId: userId,
+        profilePicture: profilePicture
+      });
+
+      console.log(`📡 Broadcasting profile picture update for user ${userId} to ${wss.clients.size} clients`);
+
+      for (const client of wss.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(broadcastData);
+        }
+      }
+
+      // Send confirmation to the user who updated it
+      ws.send(
+        JSON.stringify({
+          type: 'profile_picture_updated',
+          success: true,
+          userId: userId
+        })
+      );
+    } else {
+      console.log(`❌ User ${userId} not found for profile picture update`);
+      ws.send(
+        JSON.stringify({
+          type: 'profile_picture_update_error',
+          reason: 'User not found'
+        })
+      );
+    }
+  } catch (err) {
+    console.error("Error updating profile picture:", err.message);
+    ws.send(
+      JSON.stringify({
+        type: 'profile_picture_update_error',
         reason: 'Database error'
       })
     );
