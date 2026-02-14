@@ -75,6 +75,7 @@ export default function Sidebar() {
   const profilePicture = allProfilePics[currentUsername];
 
   return (
+    <>
     <aside
       id="user-list-container"
       data-tauri-drag-region
@@ -348,69 +349,6 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Friend Requests Modal */}
-      {showRequests && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 modal-backdrop" onClick={() => setShowRequests(false)}>
-          <div className="glass-panel-heavy rounded-3xl w-full max-w-md flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="py-4 px-5 border-b border-white/20 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-sm">🔔</span>
-                Friend Requests
-              </h2>
-              <button onClick={() => setShowRequests(false)} className="text-slate-400 hover:text-slate-200 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="px-5 py-4 flex-grow overflow-y-auto space-y-3 max-h-96">
-              {pendingRequests.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-sm text-slate-400">No pending requests</p>
-                </div>
-              ) : (
-                pendingRequests.map((request) => {
-                  const senderId = request.sender_id;
-                  const user = state.allUsers.find(u => u.id === senderId || u.username === senderId);
-                  return (
-                    <div key={senderId} className="flex items-center gap-3 p-3 rounded-lg bg-white/10 border border-white/10 hover:bg-white/15 transition-all">
-                      <div className="flex-shrink-0">
-                        {user?.profile_picture ? (
-                          <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover" alt={user?.name} />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700"></div>
-                        )}
-                      </div>
-                      <div className="flex-grow min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{user?.name || senderId}</p>
-                        <p className="text-xs text-slate-500">@{user?.username || senderId}</p>
-                      </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <button
-                          onClick={() => handleAcceptFriendRequest(senderId)}
-                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          onClick={() => handleDeclineFriendRequest(senderId)}
-                          className="px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-slate-300 text-xs font-semibold hover:bg-white/20 transition-all active:scale-95"
-                        >
-                          Decline
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Profile footer — Glass card */}
       <div className="p-3 mt-auto border-t border-white/10 dark:border-white/5">
         {state.currentUser ? (
@@ -456,6 +394,70 @@ export default function Sidebar() {
         )}
       </div>
     </aside>
+
+    {/* Friend Requests Modal - Outside sidebar */}
+    {showRequests && (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 modal-backdrop" onClick={() => setShowRequests(false)}>
+        <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
+          {/* Header */}
+          <div className="py-4 px-5 border-b border-white/20 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-sm">🔔</span>
+              Friend Requests
+            </h2>
+            <button onClick={() => setShowRequests(false)} className="text-slate-400 hover:text-slate-200 transition-colors">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="px-5 py-4 flex-grow overflow-y-auto space-y-3 max-h-96">
+            {pendingRequests.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-sm text-slate-400">No pending requests</p>
+              </div>
+            ) : (
+              pendingRequests.map((request) => {
+                const senderId = request.sender_id;
+                const user = state.allUsers.find(u => u.id === senderId || u.username === senderId);
+                return (
+                  <div key={senderId} className="flex items-center gap-3 p-3 rounded-lg bg-white/10 border border-white/10 hover:bg-white/15 transition-all">
+                    <div className="flex-shrink-0">
+                      {user?.profile_picture ? (
+                        <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover" alt={user?.name} />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-slate-600 dark:bg-slate-700"></div>
+                      )}
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{user?.name || senderId}</p>
+                      <p className="text-xs text-slate-500">@{user?.username || senderId}</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleAcceptFriendRequest(senderId)}
+                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => handleDeclineFriendRequest(senderId)}
+                        className="px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-slate-300 text-xs font-semibold hover:bg-white/20 transition-all active:scale-95"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
