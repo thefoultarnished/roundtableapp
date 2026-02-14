@@ -4,6 +4,14 @@ import { useOnlineMode } from '../hooks/useOnlineMode';
 const AppContext = createContext(null);
 
 const initialState = {
+  currentUser: (() => {
+    try {
+      const stored = localStorage.getItem('currentUser');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  })(),
   messages: {
     'placeholder-aemeath': [
       { sender: 'placeholder-aemeath', text: "Hey! Ready to run some stress tests on the UI?", time: "10:00 AM", timestamp: Date.now() - 3600000, files: [] },
@@ -145,15 +153,38 @@ const initialState = {
 
 function appReducer(state, action) {
   switch (action.type) {
+    case 'LOGIN': {
+      const { username, displayName } = action.payload;
+      const user = { username, displayName };
+      localStorage.setItem('currentUser', JSON.stringify(user));
+      localStorage.setItem('username', username);
+      localStorage.setItem('displayName', displayName);
+      return { ...state, currentUser: user };
+    }
+
+    case 'LOGOUT': {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('username');
+      localStorage.removeItem('displayName');
+      return {
+        ...state,
+        currentUser: null,
+        activeChatUserId: null,
+        allUsers: [],
+        displayedUsers: [],
+        messages: {}
+      };
+    }
+
     case 'SET_INVOKE_FUNC':
       return { ...state, globalInvokeFunc: action.payload };
 
     case 'ADD_USER': {
       const user = action.payload;
-      
+
       // We check if a user with this ID OR this SessionID already exists
-      const existsIndex = state.allUsers.findIndex(u => 
-        String(u.id) === String(user.id) || 
+      const existsIndex = state.allUsers.findIndex(u =>
+        String(u.id) === String(user.id) ||
         (user.sessionId && u.sessionId && u.sessionId === user.sessionId)
       );
 
@@ -162,17 +193,48 @@ function appReducer(state, action) {
         const updatedUsers = [...state.allUsers];
         // If sessionId matches but ID is different, it means they renamed themselves.
         // We MUST update the ID to the new one.
-        updatedUsers[existsIndex] = { ...updatedUsers[existsIndex], ...user, id: user.id };
+        updatedUsers[existsIndex] = { ...updatedUsers[existsIndex], ...user, id: user.id, status: 'online' };
         return { ...state, allUsers: updatedUsers, displayedUsers: updatedUsers };
       }
-      
-      // Otherwise, add as new
-      const newUsers = [...state.allUsers, user];
+
+      // NEW: If this user has a sessionId, mark any OLD entries with the same sessionId as offline
+      let updatedUsers = [...state.allUsers];
+      if (user.sessionId) {
+        updatedUsers = updatedUsers.map(u =>
+          u.sessionId === user.sessionId && String(u.id) !== String(user.id)
+            ? { ...u, status: 'offline' }
+            : u
+        );
+      }
+
+      // Add new user
+      const newUsers = [...updatedUsers, user];
       return { ...state, allUsers: newUsers, displayedUsers: newUsers };
     }
 
-    case 'SET_USERS':
-      return { ...state, allUsers: action.payload, displayedUsers: action.payload };
+    case 'SET_USERS': {
+      // Deduplicate users by sessionId - keep latest, mark old ones offline
+      const users = action.payload;
+      const seenSessionIds = new Set();
+      const deduped = [];
+
+      // Iterate in reverse to keep the LATEST occurrence of each sessionId
+      for (let i = users.length - 1; i >= 0; i--) {
+        const user = users[i];
+        if (user.sessionId) {
+          if (!seenSessionIds.has(user.sessionId)) {
+            seenSessionIds.add(user.sessionId);
+            deduped.unshift(user); // Keep this one
+          }
+          // Skip duplicates
+        } else {
+          // Users without sessionId - keep them (old data)
+          deduped.unshift(user);
+        }
+      }
+
+      return { ...state, allUsers: deduped, displayedUsers: deduped };
+    }
 
     case 'SET_DISPLAYED_USERS':
       return { ...state, displayedUsers: action.payload };

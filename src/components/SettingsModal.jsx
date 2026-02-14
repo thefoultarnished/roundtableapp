@@ -316,6 +316,17 @@ export default function SettingsModal() {
                 </label>
               </div>
             </div>
+
+            {/* Logout Button */}
+            <button
+              onClick={() => {
+                dispatch({ type: 'LOGOUT' });
+                closeSettings();
+              }}
+              className="w-full px-4 py-2.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold text-sm hover:shadow-lg hover:shadow-red-500/30 transition-all duration-300 hover:scale-105 active:scale-95 mt-2"
+            >
+              Logout
+            </button>
           </div>
         </div>
 

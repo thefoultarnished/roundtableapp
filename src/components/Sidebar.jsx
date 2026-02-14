@@ -160,7 +160,17 @@ export default function Sidebar() {
 
       {/* User list */}
       <div id="user-list" className="flex-grow overflow-y-auto px-2 py-1 space-y-4">
-        {state.allUsers.length === 0 && (
+        {!state.currentUser ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-200/50 to-slate-300/30 dark:from-slate-700/30 dark:to-slate-800/20 flex items-center justify-center mb-4 backdrop-blur-sm">
+              <svg className="w-8 h-8 text-slate-400/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">Log in to see users</p>
+            <p className="text-xs text-slate-400/60 mt-1">Sign up or log in to get started</p>
+          </div>
+        ) : state.allUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-200/50 to-slate-300/30 dark:from-slate-700/30 dark:to-slate-800/20 flex items-center justify-center mb-4 backdrop-blur-sm animate-pulse">
               <svg className="w-8 h-8 text-slate-400/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -170,8 +180,11 @@ export default function Sidebar() {
             <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">No users found</p>
             <p className="text-xs text-slate-400/60 mt-1">Waiting for peers on the network...</p>
           </div>
-        )}
+        ) : null}
 
+        {/* Show users only if logged in */}
+        {state.currentUser && (
+        <>
         {/* Online Section */}
         {(() => {
           const onlineUsers = state.allUsers
@@ -239,42 +252,53 @@ export default function Sidebar() {
             </div>
           );
         })()}
+        </>
+        )}
       </div>
 
       {/* Profile footer — Glass card */}
       <div className="p-3 mt-auto border-t border-white/10 dark:border-white/5">
-        <div className="flex items-center gap-3 p-2 rounded-app bg-white/20 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5 transition-all duration-300 hover:bg-white/30 dark:hover:bg-white/8 group">
-          <div className="relative flex-shrink-0">
-            {profilePicture ? (
-              <img src={profilePicture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-teal-400/30 transition-all duration-300" alt="Profile" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-lg shadow-lg ring-2 ring-white/20 group-hover:ring-purple-400/40 transition-all duration-300 group-hover:scale-105">
-                {displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
-            {/* Online indicator */}
-            <span 
-              className={`absolute -bottom-0.5 -right-0.5 block h-3.5 w-3.5 rounded-full border-2 border-white dark:border-slate-900 transition-all duration-300 ${online.isOnline ? 'bg-emerald-500 status-online-glow' : 'bg-red-500'}`}
-              title={online.isOnline ? 'Connected to Relay' : 'Disconnected'}
-            />
+        {state.currentUser ? (
+          <div className="flex items-center gap-3 p-2 rounded-app bg-white/20 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5 transition-all duration-300 hover:bg-white/30 dark:hover:bg-white/8 group">
+            <div className="relative flex-shrink-0">
+              {profilePicture ? (
+                <img src={profilePicture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-teal-400/30 transition-all duration-300" alt="Profile" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-lg shadow-lg ring-2 ring-white/20 group-hover:ring-purple-400/40 transition-all duration-300 group-hover:scale-105">
+                  {state.currentUser.displayName?.charAt(0).toUpperCase() || '?'}
+                </div>
+              )}
+              {/* Online indicator */}
+              <span
+                className={`absolute -bottom-0.5 -right-0.5 block h-3.5 w-3.5 rounded-full border-2 border-white dark:border-slate-900 transition-all duration-300 ${online.isOnline ? 'bg-emerald-500 status-online-glow' : 'bg-red-500'}`}
+                title={online.isOnline ? 'Connected to Relay' : 'Disconnected'}
+              />
+            </div>
+            <div className="flex-grow overflow-hidden min-w-0">
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-medium">Welcome,</p>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                {state.currentUser.displayName} <span className="text-slate-400 dark:text-slate-500 font-normal">@{state.currentUser.username}</span>
+              </p>
+            </div>
+            <button
+              onClick={() => dispatch({ type: 'SET_SETTINGS_OPEN', payload: true })}
+              title="Open Settings"
+              className="p-2 rounded-app text-slate-400 hover:text-teal-400 hover:bg-teal-500/10 transition-all duration-300 hover:rotate-90"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
           </div>
-          <div className="flex-grow overflow-hidden min-w-0">
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-medium">Welcome,</p>
-            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
-              {displayName} <span className="text-slate-400 dark:text-slate-500 font-normal">@{username}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => dispatch({ type: 'SET_SETTINGS_OPEN', payload: true })}
-            title="Open Settings"
-            className="p-2 rounded-app text-slate-400 hover:text-teal-400 hover:bg-teal-500/10 transition-all duration-300 hover:rotate-90"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        ) : (
+          <div className="flex items-center gap-2 p-3 rounded-app bg-white/10 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-          </button>
-        </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">Log in to get started</p>
+          </div>
+        )}
       </div>
     </aside>
   );

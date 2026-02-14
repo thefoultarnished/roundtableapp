@@ -18,6 +18,12 @@ export default function ChatArea() {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const searchInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const [authMode, setAuthMode] = useState(null); // 'login', 'signup', or null
+  const [authUsername, setAuthUsername] = useState('');
+  const [authDisplayName, setAuthDisplayName] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     if (searchActive && searchInputRef.current) {
@@ -131,6 +137,289 @@ export default function ChatArea() {
 
   // ===== Welcome Screen =====
   if (!state.activeChatUserId) {
+    // Auth UI if not logged in
+    if (!state.currentUser) {
+      return (
+        <main className="glass-panel flex-1 h-full flex flex-col rounded-2xl z-10 min-w-[400px] overflow-hidden relative">
+          {/* Animated background elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-20 right-20 w-96 h-96 bg-gradient-to-br from-cyan-500/10 to-teal-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+            <div className="absolute bottom-20 left-20 w-80 h-80 bg-gradient-to-tr from-blue-500/5 to-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }} />
+          </div>
+
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center relative z-10">
+            {/* Icon container with floating animation */}
+            <div className="mb-12 relative">
+              <div className="animate-float" style={{ animation: 'float 3s ease-in-out infinite' }}>
+                <div className="relative w-32 h-32">
+                  {/* Outer ring */}
+                  <div className="absolute inset-0 rounded-full border-2 border-gradient-to-r from-cyan-400/30 to-teal-400/30 animate-spin" style={{ animationDuration: '8s', animationDirection: 'reverse' }} />
+
+                  {/* Inner glow */}
+                  <div className="absolute inset-2 rounded-full bg-gradient-to-br from-cyan-400/10 to-teal-400/10 blur-xl" />
+
+                  {/* Icon */}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-32 h-32 text-white/20 relative" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2" />
+                    <rect width="18" height="18" x="3" y="4" rx="2" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+
+                  {/* Orbiting particles */}
+                  <div className="absolute w-2 h-2 rounded-full bg-cyan-400 shadow-lg shadow-cyan-400/50" style={{
+                    animation: 'orbit 6s linear infinite',
+                    top: '50%', left: '50%',
+                    transformOrigin: '0 0',
+                  }} />
+                  <div className="absolute w-1.5 h-1.5 rounded-full bg-teal-400 shadow-lg shadow-teal-400/50" style={{
+                    animation: 'orbit 8s linear infinite',
+                    top: '50%', left: '50%',
+                    transformOrigin: '0 0',
+                    animationDelay: '2s'
+                  }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Text content */}
+            <div className="max-w-xl">
+              <h2 className="text-5xl font-bold mb-4 bg-gradient-to-r from-cyan-400 via-blue-300 to-teal-400 bg-clip-text text-transparent leading-tight" style={{
+                fontFamily: '"Sohne", "Helvetica Neue", sans-serif',
+                fontWeight: '700',
+                letterSpacing: '-0.02em'
+              }}>
+                Welcome to Roundtable
+              </h2>
+              <p className="text-lg text-slate-400 leading-relaxed font-light">
+                Sign up or log in to start chatting. Your messages are encrypted end-to-end and never stored.
+              </p>
+            </div>
+
+            {/* Feature badges with staggered animation */}
+            <div className="mt-12 flex flex-wrap gap-3 justify-center mb-8">
+              {[
+                { icon: '🔒', label: 'End-to-end encrypted', delay: '0s' },
+                { icon: '📡', label: 'Peer-to-peer', delay: '0.1s' },
+                { icon: '⚡', label: 'Real-time', delay: '0.2s' }
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  className="px-5 py-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 text-sm text-slate-300 backdrop-blur-md hover:border-cyan-400/30 hover:bg-cyan-400/5 transition-all duration-500 hover:scale-105 hover:shadow-lg hover:shadow-cyan-400/10"
+                  style={{
+                    animation: 'fadeInUp 0.6s ease-out forwards',
+                    animationDelay: item.delay,
+                    opacity: 0
+                  }}
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  {item.label}
+                </div>
+              ))}
+            </div>
+
+            {/* Auth UI */}
+            {!authMode ? (
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setAuthMode('signup')}
+                  className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-teal-400 to-cyan-500 text-white font-semibold text-sm hover:shadow-lg hover:shadow-cyan-400/30 transition-all duration-300 hover:scale-105 active:scale-95"
+                >
+                  Sign Up
+                </button>
+                <button
+                  onClick={() => setAuthMode('login')}
+                  className="px-6 py-2.5 rounded-lg bg-white/10 border border-white/20 text-white font-semibold text-sm hover:bg-white/20 hover:border-white/40 transition-all duration-300 hover:scale-105 active:scale-95 backdrop-blur-md"
+                >
+                  Log In
+                </button>
+              </div>
+            ) : (
+              <div className="w-full max-w-xs space-y-4">
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const usernameValid = authUsername.trim().length >= 2 && authUsername.trim().length <= 14;
+                  const displayNameValid = authDisplayName.trim().length >= 2 && authDisplayName.trim().length <= 20;
+                  const passwordValid = authPassword.length >= 1 && authPassword.length <= 14;
+                  const usernameFormatValid = /^[a-zA-Z0-9_.]{2,14}$/.test(authUsername.trim());
+
+                  setAuthError('');
+
+                  // Client-side validation
+                  if (!usernameFormatValid) {
+                    setAuthError('Username: 2-14 chars (letters, numbers, dot, underscore only)');
+                    return;
+                  }
+                  if (!usernameValid) {
+                    setAuthError('Username must be 2-14 characters');
+                    return;
+                  }
+                  if (!passwordValid) {
+                    setAuthError('Password must be 1-14 characters');
+                    return;
+                  }
+                  if (authMode === 'signup' && !displayNameValid) {
+                    setAuthError('Display name must be 2-20 characters');
+                    return;
+                  }
+
+                  setAuthLoading(true);
+
+                  try {
+                    // Validate with server
+                    const validation = await online?.validateUsername?.(authUsername.trim(), authPassword, authMode);
+
+                    if (!validation?.valid) {
+                      setAuthError(validation?.reason || 'Authentication failed');
+                      setAuthLoading(false);
+                      return;
+                    }
+
+                    // Auth is valid, set password temporarily and proceed with login
+                    if (online?.setAuthPassword) {
+                      online.setAuthPassword(authPassword);
+                    }
+
+                    dispatch({
+                      type: 'LOGIN',
+                      payload: {
+                        username: authUsername.trim(),
+                        displayName: authMode === 'signup' ? authDisplayName.trim() : authUsername.trim()
+                      }
+                    });
+
+                    setAuthMode(null);
+                    setAuthUsername('');
+                    setAuthDisplayName('');
+                    setAuthPassword('');
+                  } catch (err) {
+                    setAuthError('Error during authentication');
+                    console.error('Auth validation error:', err);
+                  } finally {
+                    setAuthLoading(false);
+                  }
+                }} className="space-y-3">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Username (a-z, 0-9, ., _)"
+                      value={authUsername}
+                      onChange={(e) => setAuthUsername(e.target.value)}
+                      maxLength="14"
+                      className="w-full px-4 py-2.5 rounded-lg bg-white/30 border border-white/20 text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400/50 transition-all duration-300 backdrop-blur-md text-sm"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      maxLength="14"
+                      className="w-full px-4 py-2.5 rounded-lg bg-white/30 border border-white/20 text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400/50 transition-all duration-300 backdrop-blur-md text-sm"
+                    />
+                  </div>
+                  {authMode === 'signup' && (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Display Name"
+                        value={authDisplayName}
+                        onChange={(e) => setAuthDisplayName(e.target.value)}
+                        maxLength="20"
+                        className="w-full px-4 py-2.5 rounded-lg bg-white/30 border border-white/20 text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400/50 transition-all duration-300 backdrop-blur-md text-sm"
+                      />
+                    </div>
+                  )}
+                  {/* Validation Messages */}
+                  {authUsername.trim() && !/^[a-zA-Z0-9_.]*$/.test(authUsername.trim()) && (
+                    <p className="text-xs text-red-300/80">Only letters, numbers, dot, and underscore allowed</p>
+                  )}
+                  {authUsername.trim().length > 0 && authUsername.trim().length < 2 && (
+                    <p className="text-xs text-red-300/80">Username minimum 2 characters</p>
+                  )}
+                  {authUsername.trim().length > 14 && (
+                    <p className="text-xs text-red-300/80">Username maximum 14 characters</p>
+                  )}
+                  {authPassword.length > 0 && authPassword.length > 14 && (
+                    <p className="text-xs text-red-300/80">Password maximum 14 characters</p>
+                  )}
+                  {authMode === 'signup' && authDisplayName.trim().length > 0 && authDisplayName.trim().length < 2 && (
+                    <p className="text-xs text-red-300/80">Display name minimum 2 characters</p>
+                  )}
+                  {authMode === 'signup' && authDisplayName.trim().length > 20 && (
+                    <p className="text-xs text-red-300/80">Display name maximum 20 characters</p>
+                  )}
+                  {authError && (
+                    <p className="text-xs text-red-300/80 font-semibold">{authError}</p>
+                  )}
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={
+                      authLoading ||
+                      authUsername.trim().length < 2 ||
+                      authUsername.trim().length > 14 ||
+                      !/^[a-zA-Z0-9_.]*$/.test(authUsername.trim()) ||
+                      authPassword.length < 1 ||
+                      authPassword.length > 14 ||
+                      (authMode === 'signup' && (authDisplayName.trim().length < 2 || authDisplayName.trim().length > 20))
+                    }
+                    className={`w-full px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-300 active:scale-95 ${
+                      authLoading ||
+                      authUsername.trim().length < 2 ||
+                      authUsername.trim().length > 14 ||
+                      !/^[a-zA-Z0-9_.]*$/.test(authUsername.trim()) ||
+                      authPassword.length < 1 ||
+                      authPassword.length > 14 ||
+                      (authMode === 'signup' && (authDisplayName.trim().length < 2 || authDisplayName.trim().length > 20))
+                        ? 'bg-gradient-to-r from-slate-500 to-slate-600 text-white/50 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-teal-400 to-cyan-500 text-white hover:shadow-lg hover:shadow-cyan-400/30'
+                    }`}
+                  >
+                    {authLoading ? 'Validating...' : (authMode === 'login' ? 'Log In' : 'Sign Up')}
+                  </button>
+                </form>
+                <button
+                  onClick={() => {
+                    setAuthMode(null);
+                    setAuthUsername('');
+                    setAuthDisplayName('');
+                  }}
+                  className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white/70 font-medium text-sm hover:bg-white/20 hover:border-white/40 transition-all duration-300 backdrop-blur-md"
+                >
+                  Back
+                </button>
+              </div>
+            )}
+          </div>
+
+        <style>{`
+          @keyframes orbit {
+            from { transform: translate(-50%, -50%) rotate(0deg) translateX(48px) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg) translateX(48px) rotate(-360deg); }
+          }
+          @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+          }
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}</style>
+      </main>
+    );
+    }
+
+    // Regular welcome screen for logged-in users
     return (
       <main className="glass-panel flex-1 h-full flex flex-col rounded-2xl z-10 min-w-[400px] overflow-hidden relative">
         {/* Animated background elements */}
@@ -146,10 +435,10 @@ export default function ChatArea() {
               <div className="relative w-32 h-32">
                 {/* Outer ring */}
                 <div className="absolute inset-0 rounded-full border-2 border-gradient-to-r from-cyan-400/30 to-teal-400/30 animate-spin" style={{ animationDuration: '8s', animationDirection: 'reverse' }} />
-                
+
                 {/* Inner glow */}
                 <div className="absolute inset-2 rounded-full bg-gradient-to-br from-cyan-400/10 to-teal-400/10 blur-xl" />
-                
+
                 {/* Icon */}
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-32 h-32 text-white/20 relative" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 18a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2" />
@@ -194,7 +483,7 @@ export default function ChatArea() {
               { icon: '📡', label: 'Peer-to-peer', delay: '0.1s' },
               { icon: '⚡', label: 'Real-time', delay: '0.2s' }
             ].map((item, idx) => (
-              <div 
+              <div
                 key={idx}
                 className="px-5 py-3 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 text-sm text-slate-300 backdrop-blur-md hover:border-cyan-400/30 hover:bg-cyan-400/5 transition-all duration-500 hover:scale-105 hover:shadow-lg hover:shadow-cyan-400/10"
                 style={{
@@ -220,11 +509,11 @@ export default function ChatArea() {
             50% { transform: translateY(-20px); }
           }
           @keyframes fadeInUp {
-            from { 
+            from {
               opacity: 0;
               transform: translateY(20px);
             }
-            to { 
+            to {
               opacity: 1;
               transform: translateY(0);
             }

@@ -15,13 +15,14 @@ export function useOnlineMode(dispatch, getState) {
     const clientSessionId = useRef(Math.random().toString(36).substr(2, 9) + Date.now().toString(36));
 
     // Store shared keys: { [userId]: CryptoKey }
-    const sharedKeys = useRef({}); 
+    const sharedKeys = useRef({});
     // Store user's public keys to derive shared keys later: { [userId]: JsonWebKey }
     const userPublicKeys = useRef({});
 
     const wsRef = useRef(null);
     const pendingMessages = useRef([]); // [{targetId, text}]
     const handleServerMessageRef = useRef(null);
+    const authPasswordRef = useRef(null); // Temporary storage for password during signup
 
     // Connect to WebSocket Server (Moved to avoid TDZ)
     const connect = useCallback((serverUrl) => {
@@ -198,20 +199,19 @@ export function useOnlineMode(dispatch, getState) {
 
 
     // Identify when both Socket and Keys are ready
-    // Identify when both Socket and Keys are ready
     useEffect(() => {
         if (!ws || ws.readyState !== WebSocket.OPEN || !keyPair) return;
 
         const identify = async () => {
             // Using ws directly instead of ref to ensure we use the TRIGGERING socket
             if (ws.readyState !== WebSocket.OPEN) return;
-            
+
             // Use Username as the primary unique ID if available, fallback to random userId
             const myUsername = localStorage.getItem('username');
-            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser' 
-                ? myUsername 
-                : String(localStorage.getItem('userId')); 
-            
+            const myId = myUsername && myUsername !== 'Anonymous' && myUsername !== 'RoundtableUser'
+                ? myUsername
+                : String(localStorage.getItem('userId'));
+
             try {
                 const pubKeyJwk = await exportKey(keyPair.publicKey);
                 const name = localStorage.getItem('displayName') || myId;
@@ -224,17 +224,21 @@ export function useOnlineMode(dispatch, getState) {
                     userId: myId,
                     sessionId: clientSessionId.current, // Add persistent session tracking
                     publicKey: pubKeyJwk,
+                    password: authPasswordRef.current, // Include password if set during signup
                     info: {
                         name: name,
                         username: myId,
                         profilePicture: profilePicture
                     }
                 }));
+
+                // Clear password after sending
+                authPasswordRef.current = null;
             } catch (e) {
                 console.error("Identity export failed", e);
             }
         };
-        
+
         identify();
     }, [ws, keyPair, localStorage.getItem('displayName'), localStorage.getItem('username'), localStorage.getItem('profilePicture')]);
 
@@ -758,5 +762,60 @@ export function useOnlineMode(dispatch, getState) {
         }
     }, [getState, requestChatHistory]);
 
-    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts]);
+    const validateUsername = useCallback((username, password, mode) => {
+        return new Promise((resolve) => {
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+                console.warn('⚠️ Not connected to server, rejecting auth');
+                resolve({ valid: false, reason: 'Not connected to server' });
+                return;
+            }
+
+            // Set up a one-time listener for the validation response
+            const originalOnmessage = wsRef.current.onmessage;
+            const validationHandler = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'auth_validation') {
+                        // Restore original handler
+                        wsRef.current.onmessage = originalOnmessage;
+
+                        console.log(`✅ Auth validation response:`, data);
+                        resolve(data);
+
+                        // Re-trigger the original message handler for this message if needed
+                        if (handleServerMessageRef.current) {
+                            handleServerMessageRef.current(data);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error parsing validation response:", e);
+                }
+            };
+
+            wsRef.current.onmessage = validationHandler;
+
+            // Send validation request
+            wsRef.current.send(JSON.stringify({
+                type: 'validate_auth',
+                username: username,
+                password: password,
+                mode: mode || 'signup'
+            }));
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+                if (wsRef.current && wsRef.current.onmessage === validationHandler) {
+                    console.warn('⚠️ Validation timeout');
+                    wsRef.current.onmessage = originalOnmessage;
+                    resolve({ valid: false, reason: 'Validation timeout' });
+                }
+            }, 5000);
+        });
+    }, []);
+
+    const setAuthPassword = useCallback((password) => {
+        authPasswordRef.current = password;
+    }, []);
+
+    return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword }), [connect, sendMessageOnline, isOnline, broadcastIdentity, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword]);
 }

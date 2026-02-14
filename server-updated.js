@@ -1,6 +1,7 @@
 import { WebSocket, WebSocketServer } from "ws";
 import http from "http";
 import Database from "better-sqlite3";
+import crypto from "crypto";
 
 // Configuration
 const PORT = process.env.PORT || 8080;
@@ -9,6 +10,38 @@ const DB_PATH = "./roundtable.db";
 // Initialize Database
 const db = new Database(DB_PATH);
 console.log("✅ Connected to SQLite database");
+
+// Password hashing utilities
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto
+    .pbkdf2Sync(password, salt, 100000, 64, "sha512")
+    .toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, passwordHash) {
+  if (!passwordHash || !passwordHash.includes(":")) return false;
+  const [salt, hash] = passwordHash.split(":");
+  const testHash = crypto
+    .pbkdf2Sync(password, salt, 100000, 64, "sha512")
+    .toString("hex");
+  return testHash === hash;
+}
+
+// Ensure password column exists
+try {
+  db.exec(`
+    ALTER TABLE users ADD COLUMN password_hash TEXT;
+  `);
+  console.log("✅ Added password column to users table");
+} catch (err) {
+  if (err.message.includes("duplicate column") || err.message.includes("already exists")) {
+    console.log("📝 Password column already exists");
+  } else {
+    console.error("Error adding password column:", err.message);
+  }
+}
 
 // Prepare statements for performance
 const insertUser = db.prepare(`
@@ -108,6 +141,9 @@ wss.on("connection", (ws, req) => {
 // Message Handler
 function handleMessage(ws, data) {
   switch (data.type) {
+    case "validate_auth":
+      handleValidateAuth(ws, data);
+      break;
     case "identify":
       handleIdentify(ws, data);
       break;
@@ -148,9 +184,128 @@ function handleMessage(ws, data) {
   }
 }
 
+// Validate Auth - Check username/password for login or username availability for signup
+function handleValidateAuth(ws, data) {
+  const { username, password, mode } = data; // mode: 'login' or 'signup'
+
+  if (!username) {
+    ws.send(
+      JSON.stringify({
+        type: "auth_validation",
+        valid: false,
+        reason: "Username is required",
+      }),
+    );
+    return;
+  }
+
+  // Validate username format
+  const usernameRegex = /^[a-zA-Z0-9_.]{2,14}$/;
+  if (!usernameRegex.test(username)) {
+    ws.send(
+      JSON.stringify({
+        type: "auth_validation",
+        valid: false,
+        reason:
+          "Username must be 2-14 chars with only letters, numbers, dots, or underscores",
+      }),
+    );
+    return;
+  }
+
+  // Validate password if provided
+  if (password && password.length > 14) {
+    ws.send(
+      JSON.stringify({
+        type: "auth_validation",
+        valid: false,
+        reason: "Password must be 14 characters or less",
+      }),
+    );
+    return;
+  }
+
+  try {
+    const checkUsername = db.prepare(`
+      SELECT user_id, password_hash FROM users WHERE LOWER(username) = LOWER(?)
+    `);
+    const existing = checkUsername.get(username);
+
+    if (mode === "signup") {
+      if (existing) {
+        console.log(`❌ Username "${username}" already taken`);
+        ws.send(
+          JSON.stringify({
+            type: "auth_validation",
+            valid: false,
+            reason: "Username already taken",
+          }),
+        );
+      } else {
+        console.log(`✅ Username "${username}" is available for signup`);
+        ws.send(
+          JSON.stringify({
+            type: "auth_validation",
+            valid: true,
+            mode: "signup",
+            username: username,
+          }),
+        );
+      }
+    } else if (mode === "login") {
+      if (!existing) {
+        console.log(`❌ Username "${username}" not found`);
+        ws.send(
+          JSON.stringify({
+            type: "auth_validation",
+            valid: false,
+            reason: "Username or password incorrect",
+          }),
+        );
+      } else if (!password) {
+        ws.send(
+          JSON.stringify({
+            type: "auth_validation",
+            valid: false,
+            reason: "Password is required",
+          }),
+        );
+      } else if (!verifyPassword(password, existing.password_hash)) {
+        console.log(`❌ Invalid password for username "${username}"`);
+        ws.send(
+          JSON.stringify({
+            type: "auth_validation",
+            valid: false,
+            reason: "Username or password incorrect",
+          }),
+        );
+      } else {
+        console.log(`✅ Login successful for username "${username}"`);
+        ws.send(
+          JSON.stringify({
+            type: "auth_validation",
+            valid: true,
+            mode: "login",
+            username: username,
+          }),
+        );
+      }
+    }
+  } catch (err) {
+    console.error("Failed to validate auth:", err);
+    ws.send(
+      JSON.stringify({
+        type: "auth_validation",
+        valid: false,
+        reason: "Database error",
+      }),
+    );
+  }
+}
+
 // Handle User Identification
 function handleIdentify(ws, data) {
-  const { userId, sessionId, publicKey, info } = data;
+  const { userId, sessionId, publicKey, info, password } = data;
 
   if (!userId || !publicKey) {
     return;
@@ -165,16 +320,39 @@ function handleIdentify(ws, data) {
 
   // Save/Update user in database
   try {
-    insertUser.run(
-      userId,
-      info?.username || info?.name || userId,
-      info?.name || info?.username || userId,
-      JSON.stringify(publicKey),
-      info?.profilePicture || null,
-      now,
-      now,
-    );
-    console.log(`✅ User ${userId} saved to database`);
+    // If password provided (signup), hash it
+    let passwordHash = null;
+    if (password) {
+      passwordHash = hashPassword(password);
+    }
+
+    const username = info?.username || info?.name || userId;
+    const displayName = info?.name || info?.username || userId;
+    const publicKeyStr = JSON.stringify(publicKey);
+    const profilePic = info?.profilePicture || null;
+
+    // Check if user exists
+    const checkUserStmt = db.prepare(`SELECT user_id FROM users WHERE user_id = ?`);
+    const userExists = checkUserStmt.get(userId);
+
+    if (userExists) {
+      // User exists - update them (keep password if they have one)
+      const updateStmt = db.prepare(`
+        UPDATE users
+        SET username = ?, display_name = ?, public_key = ?, profile_picture = ?, last_seen = ?
+        WHERE user_id = ?
+      `);
+      updateStmt.run(username, displayName, publicKeyStr, profilePic, now, userId);
+      console.log(`✅ User ${userId} updated in database`);
+    } else {
+      // New user - insert with password if provided
+      const insertStmt = db.prepare(`
+        INSERT INTO users (user_id, username, display_name, public_key, profile_picture, password_hash, last_seen, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      insertStmt.run(userId, username, displayName, publicKeyStr, profilePic, passwordHash, now, now);
+      console.log(`✅ New user ${userId} created in database`);
+    }
   } catch (err) {
     console.error("Failed to save user to database:", err);
   }
@@ -428,9 +606,13 @@ function handleGetChatHistory(ws, data) {
     );
 
     // Get sender's public key from database
-    const getSenderKey = db.prepare(`SELECT public_key FROM users WHERE user_id = ?`);
+    const getSenderKey = db.prepare(
+      `SELECT public_key FROM users WHERE user_id = ?`,
+    );
     const senderKeyRow = getSenderKey.get(otherUserId);
-    const senderPublicKey = senderKeyRow ? JSON.parse(senderKeyRow.public_key) : null;
+    const senderPublicKey = senderKeyRow
+      ? JSON.parse(senderKeyRow.public_key)
+      : null;
 
     // Parse content back to objects and include sender's public key
     const parsedMessages = messages.map((msg) => ({
@@ -499,7 +681,7 @@ function handleMessageRead(data) {
     console.log(`👁️  Message ${messageId} marked as read in database`);
 
     // Extract sender ID from messageId format: senderId-recipientId-timestamp
-    const parts = messageId.split('-');
+    const parts = messageId.split("-");
     console.log(`📝 MessageId parts:`, parts);
 
     if (parts.length >= 2) {
