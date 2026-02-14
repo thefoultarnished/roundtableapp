@@ -527,11 +527,11 @@ export function useOnlineMode(dispatch, getState) {
                                     try {
                                         decryptedText = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
                                     } catch (decErr) {
-                                        console.error("Decryption error in history:", decErr);
-                                        decryptedText = "⚠️ Decryption Error";
+                                        console.warn("⚠️ Cannot decrypt message from history (keys may have changed):", decErr.message);
+                                        decryptedText = "⚠️ Unable to decrypt (keys changed or corrupted)";
                                     }
                                 } else {
-                                    decryptedText = "🔒 Encrypted Message (Missing Key)";
+                                    decryptedText = "🔒 Encrypted (Keys not available)";
                                     console.warn(`Missing shared key for ${safeSenderId} in history`);
                                 }
                             } else {
@@ -752,11 +752,11 @@ export function useOnlineMode(dispatch, getState) {
                             try {
                                 finalText = await decryptMessage(payload.iv, payload.cipher, sharedKey);
                             } catch (decErr) {
-                                console.error("Decryption low-level error:", decErr);
-                                finalText = "⚠️ Decryption Error";
+                                console.warn("⚠️ Cannot decrypt message (keys may have changed):", decErr.message);
+                                finalText = "⚠️ Unable to decrypt (keys changed or corrupted)";
                             }
                         } else {
-                            finalText = "🔒 Encrypted Message (Missing Key)";
+                            finalText = "🔒 Encrypted (Keys not available)";
                             console.warn(`Missing shared key for ${safeSenderId}. Has PubKey: ${!!userPublicKeys.current[safeSenderId]}`);
                         }
                     } else {
