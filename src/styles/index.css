@@ -8,6 +8,7 @@
 /* --- CSS Variables & Design Tokens --- */
 :root {
   --font-size-scale: 1;
+  --layout-spacing: 2px;
   --app-font: 'Inter', sans-serif;
   --chat-font: 'Inter', sans-serif;
 

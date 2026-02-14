@@ -72,7 +72,7 @@ function AppContent() {
   }, [state.settingsOpen]);
 
   return (
-    <div className="h-screen flex flex-row overflow-hidden relative">
+    <div className="h-screen flex flex-row overflow-hidden relative" style={{ gap: 'var(--layout-spacing)' }}>
       {/* Animated background layers */}
       <AuroraBackground />
       <Particles />
@@ -81,7 +81,7 @@ function AppContent() {
       <Sidebar />
 
       {/* Right Content Area */}
-      <div className="flex flex-col flex-1 overflow-hidden relative z-10 ml-2 mr-2 my-2" style={{ height: 'calc(100vh - 16px)' }}>
+      <div className="flex flex-col flex-1 overflow-hidden relative z-10" style={{ height: 'calc(100vh - calc(var(--layout-spacing) * 2))', marginRight: 'var(--layout-spacing)', marginTop: 'var(--layout-spacing)', marginBottom: 'var(--layout-spacing)' }}>
         <div className="flex-1 overflow-hidden relative w-full h-full">
           <ChatArea />
         </div>

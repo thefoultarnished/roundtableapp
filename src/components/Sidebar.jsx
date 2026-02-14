@@ -53,8 +53,8 @@ export default function Sidebar() {
     <aside
       id="user-list-container"
       data-tauri-drag-region
-      className="glass-panel my-2 ml-2 rounded-2xl flex flex-col flex-shrink-0 z-10 w-[320px] max-w-[500px]"
-      style={{ height: 'calc(100vh - 16px)' }}
+      className="glass-panel rounded-2xl flex flex-col flex-shrink-0 z-10 w-[320px] max-w-[500px]"
+      style={{ height: 'calc(100vh - calc(var(--layout-spacing) * 2))', marginLeft: 'var(--layout-spacing)', marginTop: 'var(--layout-spacing)', marginBottom: 'var(--layout-spacing)' }}
     >
       {/* Logo & Status Header */}
       <div className="pt-2 pb-2 px-4 flex items-center justify-between" data-tauri-drag-region>

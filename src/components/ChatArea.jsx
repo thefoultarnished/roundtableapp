@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 import MessageBubble from './MessageBubble';
 import { useNetwork } from '../hooks/useNetwork';
+import EmojiPicker from 'emoji-picker-react';
 import * as utils from '../utils';
 
 export default function ChatArea() {
@@ -14,7 +15,9 @@ export default function ChatArea() {
   const [inputFocused, setInputFocused] = useState(false);
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
   const [searchActive, setSearchActive] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const searchInputRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   useEffect(() => {
     if (searchActive && searchInputRef.current) {
@@ -119,6 +122,12 @@ export default function ChatArea() {
   };
 
   const handleCloseChat = () => dispatch({ type: 'SET_ACTIVE_CHAT', payload: null });
+
+  const handleEmojiClick = (emojiObject) => {
+    setInputValue(prev => prev + emojiObject.emoji);
+    setEmojiPickerOpen(false);
+    textareaRef.current?.focus();
+  };
 
   // ===== Welcome Screen =====
   if (!state.activeChatUserId) {
@@ -462,9 +471,9 @@ export default function ChatArea() {
         {/* Message input footer */}
         <footer className="p-5 flex-shrink-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent">
           <form onSubmit={handleSubmit}>
-            <div className={`flex items-end rounded-app overflow-hidden transition-all duration-300 ${
-              inputFocused 
-                ? 'ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-400/10 border-cyan-400/30' 
+            <div className={`flex items-end rounded-app overflow-visible transition-all duration-300 relative z-0 ${
+              inputFocused
+                ? 'ring-2 ring-cyan-400/40 shadow-lg shadow-cyan-400/10 border-cyan-400/30'
                 : 'border border-white/10 hover:border-white/20'
             } bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl`}>
               
@@ -480,6 +489,35 @@ export default function ChatArea() {
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                   </svg>
                 </button>
+              </div>
+
+              {/* Emoji picker button wrapper */}
+              <div className="h-12 flex items-center justify-center relative" ref={emojiPickerRef}>
+                <button
+                  type="button"
+                  onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+                  className="p-2 text-slate-400 hover:text-cyan-400 transition-all duration-300 hover:scale-110 rounded-app hover:bg-cyan-400/10 active:scale-95 flex-shrink-0"
+                  title="Add emoji"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                    <line x1="9" y1="9" x2="9.01" y2="9" />
+                    <line x1="15" y1="9" x2="15.01" y2="9" />
+                  </svg>
+                </button>
+
+                {/* Emoji picker popup */}
+                {emojiPickerOpen && (
+                  <div className="absolute bottom-12 left-0 z-50">
+                    <EmojiPicker
+                      onEmojiClick={handleEmojiClick}
+                      theme="dark"
+                      height={400}
+                      width={320}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Textarea */}
