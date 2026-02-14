@@ -45,7 +45,8 @@ function MessageBubble({ message }) {
     isSentByMe ? null : state.allUsers.find(u => u.id === message.sender),
     [isSentByMe, message.sender, state.allUsers]
   );
-  const myProfilePicture = useMemo(() => localStorage.getItem('profilePicture'), []);
+  // Get profile picture reactively (not memoized so it updates when localStorage changes)
+  const myProfilePicture = localStorage.getItem('profilePicture');
 
   // Glass message style
   const sentStyle = 'bg-gradient-to-br from-teal-500/90 to-cyan-600/90 text-white shadow-lg shadow-teal-500/15';

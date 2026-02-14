@@ -153,6 +153,19 @@ export default function SettingsModal() {
           localStorage.setItem('profilePictures', JSON.stringify(allProfilePics));
         }
 
+        // Also save to profilePicture key for MessageBubble to pick up
+        localStorage.setItem('profilePicture', resized);
+
+        // Trigger a re-render by dispatching a state update
+        // This ensures all components that display the profile picture refresh
+        dispatch({
+          type: 'LOGIN',
+          payload: {
+            username: state.currentUser?.username || localStorage.getItem('username'),
+            displayName: state.currentUser?.displayName || displayName
+          }
+        });
+
         // Broadcast profile picture update to server if in online mode
         if (online?.sendProfilePictureUpdate) {
           online.sendProfilePictureUpdate(resized);
