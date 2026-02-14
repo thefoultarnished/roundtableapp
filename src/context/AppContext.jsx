@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
 import { useOnlineMode } from '../hooks/useOnlineMode';
+import { useProfilePictureSync } from '../hooks/useProfilePictureSync';
+import { setCachedProfilePic, clearAllProfilePicCaches } from '../utils/profilePictureCache';
 
 const AppContext = createContext(null);
 
@@ -176,6 +178,10 @@ function appReducer(state, action) {
       localStorage.removeItem('appUserId'); // Clear persistent user ID
       localStorage.removeItem('tempAuthPassword'); // Clear temporary password
       localStorage.removeItem('authPassword'); // Clear persistent password on logout
+
+      // Clear all profile picture caches
+      clearAllProfilePicCaches();
+
       return {
         ...state,
         currentUser: null,
@@ -376,9 +382,15 @@ function appReducer(state, action) {
 
     case 'UPDATE_USER_PROFILE_PICTURE': {
       const { userId, profilePicture } = action.payload;
-      const updatedUsers = state.allUsers.map(u =>
-        (u.id === userId || u.username === userId) ? { ...u, profile_picture: profilePicture } : u
-      );
+      const updatedUsers = state.allUsers.map(u => {
+        if (u.id === userId || u.username === userId) {
+          // Cache the new profile picture URL
+          const username = u.username || userId;
+          setCachedProfilePic(username, profilePicture, Date.now());
+          return { ...u, profile_picture: profilePicture };
+        }
+        return u;
+      });
       return { ...state, allUsers: updatedUsers, displayedUsers: updatedUsers };
     }
 
@@ -394,8 +406,11 @@ export function AppProvider({ children }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const getState = useCallback(() => stateRef.current, []);
-  
+
   const online = useOnlineMode(dispatch, getState);
+
+  // Sync profile pictures on app launch
+  useProfilePictureSync(dispatch, state.allUsers, online?.isOnline);
 
   return (
     <AppContext.Provider value={{ state, dispatch, getState, online }}>

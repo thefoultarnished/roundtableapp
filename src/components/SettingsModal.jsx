@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useNetwork } from '../hooks/useNetwork';
 import GlassDropdown from './GlassDropdown';
+import { setCachedProfilePic } from '../utils/profilePictureCache';
 
 export default function SettingsModal() {
   const { state, dispatch, online } = useAppContext();
@@ -17,6 +18,9 @@ export default function SettingsModal() {
   const [theme, setTheme] = useState('light');
   const [profilePicture, setProfilePicture] = useState('');
   const [savedProfilePicture, setSavedProfilePicture] = useState(''); // Track last saved picture
+  const [uploadingPicture, setUploadingPicture] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const blobUrlRef = useRef(null); // Track blob URL for cleanup
   const [windowTransparency, setWindowTransparency] = useState(true);
   const [transparencyLevel, setTransparencyLevel] = useState(0.75); // UI Glass
   const [windowOpacity, setWindowOpacity] = useState(0.70); // Main Background
@@ -42,14 +46,112 @@ export default function SettingsModal() {
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
       setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
+
+      // Clear upload states when opening settings
+      setUploadingPicture(false);
+      setUploadError('');
     };
 
     if (state.settingsOpen) {
       syncSettings();
     }
+
+    // Cleanup blob URL on unmount
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
   }, [state.settingsOpen, state.allUsers]);
 
   const closeSettings = () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: false });
+
+  // Upload profile picture with rollback on error
+  const uploadProfilePictureWithRollback = async () => {
+    setUploadingPicture(true);
+    setUploadError('');
+
+    const userId = localStorage.getItem('username');
+    const serverUrl = localStorage.getItem('relayServerUrl') || 'http://129.154.231.157:8080';
+    const uploadUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://') + '/upload-image';
+    const timestamp = Date.now();
+    const versionedFileName = `${userId}_${timestamp}.png`;
+
+    let uploadedImageUrl = null;
+    const previousPicture = savedProfilePicture;
+
+    try {
+      // Step 1: Upload to MinIO with versioned filename
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageData: profilePicture,
+          userId: userId,
+          fileName: versionedFileName
+        })
+      });
+
+      const data = await response.json();
+
+      if (!data.success || !data.imageUrl) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      uploadedImageUrl = data.imageUrl;
+      console.log(`✅ Image uploaded to MinIO: ${uploadedImageUrl}`);
+
+      // Step 2: Update database via WebSocket
+      if (online?.sendProfilePictureUpdate) {
+        online.sendProfilePictureUpdate(uploadedImageUrl);
+      } else {
+        throw new Error('Not connected to server');
+      }
+
+      // Step 3: Update local state
+      dispatch({
+        type: 'UPDATE_USER_PROFILE_PICTURE',
+        payload: {
+          userId: userId,
+          profilePicture: uploadedImageUrl
+        }
+      });
+
+      // Step 4: Update cache
+      setCachedProfilePic(userId, uploadedImageUrl, timestamp);
+
+      // Step 5: Cleanup blob URL
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+
+      setSavedProfilePicture(uploadedImageUrl);
+      setProfilePicture(uploadedImageUrl);
+      setUploadingPicture(false);
+
+    } catch (err) {
+      console.error('❌ Image upload error:', err);
+      setUploadError(err.message || 'Upload failed');
+
+      // Rollback: Revert UI to previous picture
+      setProfilePicture(previousPicture);
+      setSavedProfilePicture(previousPicture);
+
+      // Cleanup blob URL on error
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+
+      setUploadingPicture(false);
+
+      // TODO: If MinIO upload succeeded but broadcast failed,
+      // we should delete the uploaded file from MinIO
+      // This would require a delete endpoint on the server
+    }
+  };
 
   const handleSave = () => {
     // Persist to localStorage
@@ -97,49 +199,9 @@ export default function SettingsModal() {
 
     // Check if profile picture changed
     const profilePicChanged = profilePicture !== savedProfilePicture;
-    if (profilePicChanged && profilePicture) {
-      // Upload to MinIO through server
-      const uploadImage = async () => {
-        try {
-          const userId = localStorage.getItem('username');
-          const serverUrl = localStorage.getItem('relayServerUrl') || 'http://129.154.231.157:8080';
-          const uploadUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://') + '/upload-image';
-          const response = await fetch(uploadUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imageData: profilePicture,
-              userId: userId,
-              fileName: `profile-${Date.now()}.png`
-            })
-          });
-
-          const data = await response.json();
-          if (data.success && data.imageUrl) {
-            // Update local state immediately
-            const myUsername = localStorage.getItem('username');
-            dispatch({
-              type: 'UPDATE_USER_PROFILE_PICTURE',
-              payload: {
-                userId: myUsername,
-                profilePicture: data.imageUrl
-              }
-            });
-
-            // Send MinIO URL to server
-            if (online?.sendProfilePictureUpdate) {
-              online.sendProfilePictureUpdate(data.imageUrl);
-            }
-            setSavedProfilePicture(profilePicture);
-            console.log(`✅ Image uploaded to MinIO: ${data.imageUrl}`);
-          } else {
-            console.error('❌ Image upload failed:', data.error);
-          }
-        } catch (err) {
-          console.error('❌ Image upload error:', err);
-        }
-      };
-      uploadImage();
+    if (profilePicChanged && profilePicture && !uploadingPicture) {
+      // Upload to MinIO through server with new flow
+      uploadProfilePictureWithRollback();
     }
 
     // Only announce presence if username or displayName actually changed
@@ -182,15 +244,36 @@ export default function SettingsModal() {
   const handlePfpChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
+
+    // Clear any previous error
+    setUploadError('');
+
+    // Cleanup previous blob URL if exists
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        canvas.width = 96; canvas.height = 96;
+        canvas.width = 96;
+        canvas.height = 96;
         canvas.getContext('2d').drawImage(img, 0, 0, 96, 96);
         const resized = canvas.toDataURL('image/png');
-        setProfilePicture(resized); // Just update local preview, save on Save button click
+
+        // Create blob URL for instant preview (optimistic update)
+        fetch(resized)
+          .then(res => res.blob())
+          .then(blob => {
+            const blobUrl = URL.createObjectURL(blob);
+            blobUrlRef.current = blobUrl;
+          });
+
+        // Set the base64 data for upload (will happen on Save)
+        setProfilePicture(resized);
       };
       img.src = ev.target.result;
     };
@@ -241,25 +324,34 @@ export default function SettingsModal() {
             <SectionHeader color="teal" label="Profile" />
             <div className="flex flex-col items-center p-4 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="relative group mb-3">
-                <div className="w-20 h-20 rounded-full overflow-hidden ring-3 ring-white/20 group-hover:ring-teal-400/40 transition-all duration-400 shadow-lg">
+                <div className={`w-20 h-20 rounded-full overflow-hidden ring-3 ring-white/20 group-hover:ring-teal-400/40 transition-all duration-400 shadow-lg ${uploadingPicture ? 'opacity-50' : ''}`}>
                   <img
                     src={profilePicture || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>'}
                     className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 object-cover"
                     alt="Profile"
                   />
                 </div>
+                {uploadingPicture && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => document.getElementById('pfp-file-input')?.click()}
-                  className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white shadow-lg shadow-teal-500/30 border-2 border-white dark:border-slate-900 hover:scale-110 transition-transform duration-300"
+                  disabled={uploadingPicture}
+                  className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white shadow-lg shadow-teal-500/30 border-2 border-white dark:border-slate-900 hover:scale-110 transition-transform duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </button>
-                <input type="file" id="pfp-file-input" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handlePfpChange} />
+                <input type="file" id="pfp-file-input" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handlePfpChange} disabled={uploadingPicture} />
               </div>
+              {uploadError && (
+                <p className="text-[9px] text-red-500 text-center mt-2 font-medium">{uploadError}</p>
+              )}
             </div>
             <div className="space-y-3">
               <div>

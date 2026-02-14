@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 // Assuming src/utils/crypto.js exists
 import { isWindowFocused } from '../utils';
 import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage } from '../utils/crypto';
+import { setCachedProfilePic } from '../utils/profilePictureCache';
 
 export function useOnlineMode(dispatch, getState) {
     const [ws, setWs] = useState(null);
@@ -363,6 +364,11 @@ export function useOnlineMode(dispatch, getState) {
                         const numId = parseInt(newUser.id, 10);
                         const sId = isNaN(numId) ? newUser.id : numId;
                         console.log(`👤 Adding user to sidebar: ${sId} (${newUser.info.name}) [Session: ${newUser.sessionId}]`);
+                        // Cache profile picture if available
+                        if (newUser.info.profilePicture && newUser.info.username) {
+                            setCachedProfilePic(newUser.info.username, newUser.info.profilePicture, Date.now());
+                        }
+
                         dispatch({
                             type: 'ADD_USER',
                             payload: {
@@ -410,6 +416,12 @@ export function useOnlineMode(dispatch, getState) {
                 const allUsersForContext = data.users.map(u => {
                     const numericId = parseInt(u.id, 10);
                     const safeId = isNaN(numericId) ? u.id : numericId;
+
+                    // Cache profile picture if available
+                    if (u.info.profilePicture && u.info.username) {
+                        setCachedProfilePic(u.info.username, u.info.profilePicture, Date.now());
+                    }
+
                     return {
                         id: safeId,
                         sessionId: u.sessionId, // IMPORTANT
@@ -740,10 +752,13 @@ export function useOnlineMode(dispatch, getState) {
 
             case 'profile_picture_updated': {
                 console.log('📸 Profile picture update received:', data);
-                const { userId, profilePicture } = data;
+                const { userId, profilePicture, timestamp } = data;
 
                 // Only update if profilePicture URL is actually provided
                 if (profilePicture) {
+                    // Cache the new profile picture with timestamp from server
+                    setCachedProfilePic(userId, profilePicture, timestamp || Date.now());
+
                     dispatch({
                         type: 'UPDATE_USER_PROFILE_PICTURE',
                         payload: {
@@ -751,7 +766,7 @@ export function useOnlineMode(dispatch, getState) {
                             profilePicture: profilePicture
                         }
                     });
-                    console.log(`✅ Updated profile picture for user ${userId}`);
+                    console.log(`✅ Updated profile picture for user ${userId} and cached`);
                 } else {
                     console.log(`📸 Received profile picture confirmation (no URL in payload)`);
                 }

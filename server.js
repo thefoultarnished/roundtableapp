@@ -1284,6 +1284,7 @@ function handleUpdateProfilePicture(ws, data) {
         type: "profile_picture_updated",
         userId: userId,
         profilePicture: profilePicture,
+        timestamp: Date.now(),
       });
 
       console.log(
