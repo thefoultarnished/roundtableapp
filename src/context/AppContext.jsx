@@ -193,6 +193,10 @@ function appReducer(state, action) {
       localStorage.removeItem('tempAuthPassword'); // Clear temporary password
       localStorage.removeItem('authPassword'); // Clear persistent password on logout
 
+      // DO NOT remove privKey/pubKey - keep them for old message decryption
+      // localStorage.removeItem('privKey');
+      // localStorage.removeItem('pubKey');
+
       // Clear all profile picture caches
       clearAllProfilePicCaches();
 
