@@ -377,7 +377,7 @@ function appReducer(state, action) {
     case 'UPDATE_USER_PROFILE_PICTURE': {
       const { userId, profilePicture } = action.payload;
       const updatedUsers = state.allUsers.map(u =>
-        u.id === userId ? { ...u, profile_picture: profilePicture } : u
+        (u.id === userId || u.username === userId) ? { ...u, profile_picture: profilePicture } : u
       );
       return { ...state, allUsers: updatedUsers, displayedUsers: updatedUsers };
     }

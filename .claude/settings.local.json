@@ -11,7 +11,9 @@
       "Bash(lsof:*)",
       "Bash(sqlite3:*)",
       "Bash(npx vite:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)"
     ]
   }
 }

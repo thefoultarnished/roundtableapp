@@ -45,8 +45,18 @@ function MessageBubble({ message }) {
     isSentByMe ? null : state.allUsers.find(u => u.id === message.sender),
     [isSentByMe, message.sender, state.allUsers]
   );
-  // Get profile picture reactively (not memoized so it updates when localStorage changes)
-  const myProfilePicture = localStorage.getItem('profilePicture');
+  // Get current user's profile picture from Redux state
+  const currentUserData = isSentByMe ? state.allUsers.find(u => u.username === state.currentUser) : null;
+  const myProfilePicture = currentUserData?.profile_picture || null;
+
+  if (isSentByMe && !myProfilePicture) {
+    console.warn('⚠️ MyProfilePicture is null/empty', {
+      currentUser: state.currentUser?.username,
+      currentUserData,
+      allUsersCount: state.allUsers.length,
+      allUsers: state.allUsers.map(u => ({ username: u.username, hasPic: !!u.profile_picture }))
+    });
+  }
 
   // Glass message style
   const sentStyle = 'bg-gradient-to-br from-teal-500/90 to-cyan-600/90 text-white shadow-lg shadow-teal-500/15';

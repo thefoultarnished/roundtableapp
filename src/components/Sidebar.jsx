@@ -66,13 +66,14 @@ export default function Sidebar() {
   }, [dispatch, online]);
 
 
-  const displayName = localStorage.getItem('displayName') || 'New User';
-  const username = localStorage.getItem('username') || 'anonymous';
+  // Only use real values if user is actually logged in
+  const displayName = state.currentUser?.displayName || localStorage.getItem('displayName');
+  const username = state.currentUser?.username || localStorage.getItem('username');
   const currentUsername = state.currentUser?.username || localStorage.getItem('username');
 
-  // Get profile picture mapped to current username
-  const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
-  const profilePicture = allProfilePics[currentUsername];
+  // Get profile picture from Redux state (server source of truth)
+  const currentUserData = state.allUsers.find(u => u.username === currentUsername);
+  const profilePicture = currentUserData?.profile_picture || null;
 
   return (
     <>

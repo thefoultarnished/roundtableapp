@@ -200,13 +200,16 @@ export function useOnlineMode(dispatch, getState) {
 
     // Identify when both Socket and Keys are ready
     useEffect(() => {
-        if (!ws || ws.readyState !== WebSocket.OPEN || !keyPair) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN || !keyPair) {
+            console.log('⏸️  Not ready to identify:', { hasWs: !!ws, wsOpen: ws?.readyState === WebSocket.OPEN, hasKeyPair: !!keyPair });
+            return;
+        }
 
         const identify = async () => {
             // Using ws directly instead of ref to ensure we use the TRIGGERING socket
             if (ws.readyState !== WebSocket.OPEN) return;
 
-            // Use persistent userId (not username) - username can change
+            // Use username as the unique ID
             const myUsername = localStorage.getItem('username');
 
             // DON'T identify if not logged in (no username set)
@@ -215,25 +218,11 @@ export function useOnlineMode(dispatch, getState) {
                 return;
             }
 
-            // Get or create ONE persistent user ID (not per username)
-            let myId = localStorage.getItem('appUserId');
-            if (!myId) {
-                myId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                localStorage.setItem('appUserId', myId);
-                console.log(`✅ Created persistent app user ID: ${myId}`);
-            } else {
-                console.log(`✅ Using existing persistent app user ID: ${myId}`);
-            }
-
             try {
                 const pubKeyJwk = await exportKey(keyPair.publicKey);
-                const name = localStorage.getItem('displayName') || myId;
+                const name = localStorage.getItem('displayName') || myUsername;
 
-                // Get profile picture mapped to this user
-                const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
-                const profilePicture = allProfilePics[myId] || null;
-
-                console.log(`🔑 Identifying as [${myId}] on session [${clientSessionId.current}]`);
+                console.log(`🔑 Identifying as [${myUsername}] on session [${clientSessionId.current}]`);
 
                 // Get password from ref or localStorage
                 // Use 'authPassword' for persistent session, or 'tempAuthPassword' for backward compatibility
@@ -243,14 +232,13 @@ export function useOnlineMode(dispatch, getState) {
 
                 ws.send(JSON.stringify({
                     type: 'identify',
-                    userId: myId,
+                    userId: myUsername,  // Use username as ID
                     sessionId: clientSessionId.current,
                     publicKey: pubKeyJwk,
                     password: password, // Include password for signup/initial login
                     info: {
                         name: name,
-                        username: myUsername,
-                        profilePicture: profilePicture
+                        username: myUsername
                     }
                 }));
 
@@ -263,25 +251,22 @@ export function useOnlineMode(dispatch, getState) {
         };
 
         identify();
-    }, [ws, keyPair, localStorage.getItem('displayName'), localStorage.getItem('username'), localStorage.getItem('profilePicture')]);
+    }, [ws, keyPair]);
 
     const broadcastIdentity = useCallback(() => {
         if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && keyPair) {
             const myUsername = localStorage.getItem('username');
 
             // Get or create ONE persistent user ID for the entire app
-            let myId = localStorage.getItem('appUserId');
+            let myId = localStorage.getItem('username');
             if (!myId) {
                 myId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                localStorage.setItem('appUserId', myId);
+                localStorage.setItem('username', myId);
             }
 
             exportKey(keyPair.publicKey).then(pubKeyJwk => {
                 const name = localStorage.getItem('displayName') || myId;
 
-                // Get profile picture mapped to this user
-                const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
-                const profilePicture = allProfilePics[myId] || null;
                 console.log(`📣 Broadcasting Identity manually as [${myId}]...`);
                 wsRef.current.send(JSON.stringify({
                     type: 'identify',
@@ -290,8 +275,8 @@ export function useOnlineMode(dispatch, getState) {
                     publicKey: pubKeyJwk,
                     info: {
                         name: name,
-                        username: myUsername,
-                        profilePicture: localStorage.getItem('profilePicture') || null
+                        username: myUsername
+                        // Profile picture is handled separately by sendProfilePictureUpdate
                     }
                 }));
                 console.log("📣 Manual Identity Broadcast Sent");
@@ -309,7 +294,7 @@ export function useOnlineMode(dispatch, getState) {
         }
 
         // Get persistent user ID (global to app)
-        let myId = localStorage.getItem('appUserId');
+        let myId = localStorage.getItem('username');
         if (!myId) {
             console.warn(`⚠️ No persistent ID found`);
             return;
@@ -361,10 +346,10 @@ export function useOnlineMode(dispatch, getState) {
             case 'user_connected': {
                 const newUser = data.user;
                 // Get persistent user ID (global to app)
-                let myIdOnConnect = localStorage.getItem('appUserId');
+                let myIdOnConnect = localStorage.getItem('username');
                 if (!myIdOnConnect) {
                     myIdOnConnect = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                    localStorage.setItem('appUserId', myIdOnConnect);
+                    localStorage.setItem('username', myIdOnConnect);
                 }
 
                 if (newUser && String(newUser.id) !== String(myIdOnConnect) && newUser.publicKey) {
@@ -400,12 +385,14 @@ export function useOnlineMode(dispatch, getState) {
             }
 
             case 'user_list': {
-                // Filter out self - use persistent user ID (global to app)
-                const myIdList = localStorage.getItem('appUserId');
+                // Include ALL users including self - use persistent user ID (global to app)
+                const myIdList = localStorage.getItem('username');
+                const myUser = data.users.find(u => String(u.id) === String(myIdList));
 
+                // Get all other users
                 const others = data.users.filter(u => String(u.id) !== String(myIdList));
 
-                // Import and Store their public keys (Async)
+                // Import and Store their public keys (Async) - for others only
                 await Promise.all(others.map(async (u) => {
                     if (u.publicKey) {
                         try {
@@ -419,8 +406,8 @@ export function useOnlineMode(dispatch, getState) {
                     }
                 }));
 
-                // Update App Context (Full Sync)
-                const userListForContext = others.map(u => {
+                // Update App Context (Full Sync) - include SELF
+                const allUsersForContext = data.users.map(u => {
                     const numericId = parseInt(u.id, 10);
                     const safeId = isNaN(numericId) ? u.id : numericId;
                     return {
@@ -429,13 +416,13 @@ export function useOnlineMode(dispatch, getState) {
                         name: u.info.name || 'Unknown User',
                         username: u.info.username || 'unknown',
                         profile_picture: u.info.profilePicture,
-                        status: 'online',
+                        status: u.status || 'online',
                         avatarGradient: 'from-blue-500 to-purple-500'
                     };
                 });
 
-                dispatch({ type: 'SET_USERS', payload: userListForContext });
-                console.log(`📡 Synced ${userListForContext.length} users from relay`);
+                dispatch({ type: 'SET_USERS', payload: allUsersForContext });
+                console.log(`📡 Synced ${allUsersForContext.length} users from relay (including self)`);
                 break;
             }
 
@@ -465,7 +452,7 @@ export function useOnlineMode(dispatch, getState) {
                     const formattedMessages = await Promise.all(messages.map(async (msg) => {
                         let decryptedText = '';
                         // Get persistent user ID (global to app)
-                        const myId = localStorage.getItem('appUserId');
+                        const myId = localStorage.getItem('username');
 
                         // Check if sender is me
                         const isFromMe = msg.senderId === myId;
@@ -647,7 +634,7 @@ export function useOnlineMode(dispatch, getState) {
 
                 // Store userId from server
                 if (data.userId) {
-                    localStorage.setItem('appUserId', data.userId);
+                    localStorage.setItem('username', data.userId);
                     localStorage.setItem('userId', data.userId); // Keep for compatibility
                     console.log(`✅ Stored userId from registration: ${data.userId}`);
                 }
@@ -755,16 +742,19 @@ export function useOnlineMode(dispatch, getState) {
                 console.log('📸 Profile picture update received:', data);
                 const { userId, profilePicture } = data;
 
-                // Update the user's profile picture in the app state
-                dispatch({
-                    type: 'UPDATE_USER_PROFILE_PICTURE',
-                    payload: {
-                        userId: userId,
-                        profilePicture: profilePicture
-                    }
-                });
-
-                console.log(`✅ Updated profile picture for user ${userId}`);
+                // Only update if profilePicture URL is actually provided
+                if (profilePicture) {
+                    dispatch({
+                        type: 'UPDATE_USER_PROFILE_PICTURE',
+                        payload: {
+                            userId: userId,
+                            profilePicture: profilePicture
+                        }
+                    });
+                    console.log(`✅ Updated profile picture for user ${userId}`);
+                } else {
+                    console.log(`📸 Received profile picture confirmation (no URL in payload)`);
+                }
                 break;
             }
         }
@@ -999,7 +989,7 @@ export function useOnlineMode(dispatch, getState) {
             return;
         }
 
-        const userId = localStorage.getItem('appUserId');
+        const userId = localStorage.getItem('username');
         if (!userId) {
             console.warn('❌ No user ID found');
             return;

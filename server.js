@@ -2,10 +2,37 @@ import { WebSocket, WebSocketServer } from "ws";
 import http from "http";
 import Database from "better-sqlite3";
 import crypto from "crypto";
+import { Client as MinioClient } from "minio";
 
 // Configuration
 const PORT = process.env.PORT || 8080;
 const DB_PATH = "./roundtable.db";
+
+// MinIO Configuration
+const MINIO_ENDPOINT = "129.154.231.157";
+const MINIO_PORT = 9000;
+const MINIO_ACCESS_KEY = "admin";
+const MINIO_SECRET_KEY = "minMIN_35!@";
+const MINIO_BUCKET = "roundtable";
+const MINIO_URL = `http://${MINIO_ENDPOINT}:${MINIO_PORT}`;
+
+// Initialize MinIO Client
+const minioClient = new MinioClient({
+  endPoint: MINIO_ENDPOINT,
+  port: MINIO_PORT,
+  useSSL: false,
+  accessKey: MINIO_ACCESS_KEY,
+  secretKey: MINIO_SECRET_KEY,
+});
+
+// Ensure bucket exists
+minioClient.bucketExists(MINIO_BUCKET, (err) => {
+  if (err) {
+    console.error("❌ Error checking MinIO bucket:", err);
+  } else {
+    console.log(`✅ MinIO bucket "${MINIO_BUCKET}" is ready`);
+  }
+});
 
 // Initialize Database
 const db = new Database(DB_PATH);
@@ -115,7 +142,7 @@ const insertUser = db.prepare(`
 `);
 
 const updateUserLastSeen = db.prepare(`
-  UPDATE users SET last_seen = ? WHERE user_id = ?
+  UPDATE users SET last_seen = ? WHERE username = ? OR user_id = ?
 `);
 
 const insertMessage = db.prepare(`
@@ -141,6 +168,10 @@ const markMessageRead = db.prepare(`
 
 const getAllUsers = db.prepare(`
   SELECT * FROM users ORDER BY last_seen DESC
+`);
+
+const getUserProfilePicture = db.prepare(`
+  SELECT profile_picture FROM users WHERE username = ? OR user_id = ?
 `);
 
 const getChatHistory = db.prepare(`
@@ -191,6 +222,68 @@ const getSentFriendRequests = db.prepare(`
 
 // Create HTTP server
 const server = http.createServer((req, res) => {
+  // CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+
+  // Handle image upload endpoint
+  if (req.method === "POST" && req.url === "/upload-image") {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+    req.on("end", async () => {
+      try {
+        const data = JSON.parse(body);
+        const { imageData, userId, fileName } = data;
+
+        if (!imageData || !userId) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Missing imageData or userId" }));
+          return;
+        }
+
+        // Convert base64 to buffer
+        const buffer = Buffer.from(imageData.split(",")[1], "base64");
+        const objectName = `${userId}/${fileName || `profile-${Date.now()}.png`}`;
+
+        // Upload to MinIO
+        minioClient.putObject(
+          MINIO_BUCKET,
+          objectName,
+          buffer,
+          buffer.length,
+          {},
+          (err) => {
+            if (err) {
+              console.error("❌ MinIO upload error:", err);
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Upload failed" }));
+            } else {
+              const imageUrl = `${MINIO_URL}/${MINIO_BUCKET}/${objectName}`;
+              console.log(`✅ Image uploaded to MinIO: ${imageUrl}`);
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ success: true, imageUrl }));
+            }
+          },
+        );
+      } catch (err) {
+        console.error("❌ Upload endpoint error:", err);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Server error" }));
+      }
+    });
+    return;
+  }
+
   res.writeHead(200);
   res.end("Roundtable Relay Server is Running with SQLite Persistence");
 });
@@ -228,7 +321,7 @@ wss.on("connection", (ws, req) => {
 
       // Update last_seen in database
       const now = Date.now();
-      updateUserLastSeen.run(now, ws.userId);
+      updateUserLastSeen.run(now, ws.userId, ws.userId);
 
       connectedUsers.delete(ws.userId);
       broadcastUserList();
@@ -449,23 +542,45 @@ function handleIdentify(ws, data) {
       passwordHash = hashPassword(password);
     }
 
-    const username = (info?.username && info.username.trim()) ? info.username : (info?.name || userId);
-    const displayName = (info?.name && info.name.trim()) ? info.name : username;
+    const username =
+      info?.username && info.username.trim()
+        ? info.username
+        : info?.name || userId;
+    const displayName = info?.name && info.name.trim() ? info.name : username;
     const publicKeyStr = JSON.stringify(publicKey);
     const profilePic = info?.profilePicture || null;
 
-    // Check if user exists
-    const checkUserStmt = db.prepare(`SELECT user_id FROM users WHERE user_id = ?`);
-    const userExists = checkUserStmt.get(userId);
+    // Check if user exists (by username since that's our identifier now)
+    const checkUserStmt = db.prepare(
+      `SELECT user_id FROM users WHERE username = ?`,
+    );
+    const userExists = checkUserStmt.get(username);
 
     if (userExists) {
       // User exists - update them (keep password if they have one)
-      const updateStmt = db.prepare(`
-        UPDATE users
-        SET username = ?, display_name = ?, public_key = ?, profile_picture = ?, last_seen = ?
-        WHERE user_id = ?
-      `);
-      updateStmt.run(username, displayName, publicKeyStr, profilePic, now, userId);
+      // Only update profile_picture if it was explicitly provided in the identify message
+      if (info?.profilePicture) {
+        const updateStmt = db.prepare(`
+          UPDATE users
+          SET user_id = ?, display_name = ?, public_key = ?, profile_picture = ?, last_seen = ?
+          WHERE username = ?
+        `);
+        updateStmt.run(
+          userId,
+          displayName,
+          publicKeyStr,
+          profilePic,
+          now,
+          username,
+        );
+      } else {
+        const updateStmt = db.prepare(`
+          UPDATE users
+          SET user_id = ?, display_name = ?, public_key = ?, last_seen = ?
+          WHERE username = ?
+        `);
+        updateStmt.run(userId, displayName, publicKeyStr, now, username);
+      }
       console.log(`✅ User ${userId} updated in database`);
     } else {
       // New user - insert with password if provided
@@ -473,7 +588,16 @@ function handleIdentify(ws, data) {
         INSERT INTO users (user_id, username, display_name, public_key, profile_picture, password_hash, last_seen, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      insertStmt.run(userId, username, displayName, publicKeyStr, profilePic, passwordHash, now, now);
+      insertStmt.run(
+        userId,
+        username,
+        displayName,
+        publicKeyStr,
+        profilePic,
+        passwordHash,
+        now,
+        now,
+      );
       console.log(`✅ New user ${userId} created in database`);
     }
   } catch (err) {
@@ -543,7 +667,9 @@ function handleIdentify(ws, data) {
   }
 
   // Notify user they are registered and send their user_id
-  ws.send(JSON.stringify({ type: "registered", success: true, userId: userId }));
+  ws.send(
+    JSON.stringify({ type: "registered", success: true, userId: userId }),
+  );
 
   // Update everyone else
   broadcastUserList();
@@ -682,11 +808,18 @@ function broadcastUserList() {
 
   // Then, update online users from connectedUsers
   for (const [id, u] of connectedUsers.entries()) {
+    // Get the user's database record to ensure we have the latest profilePicture
+    const dbUser = getUserProfilePicture.get(id, id);
+    const profilePicture = dbUser?.profile_picture || null;
+
     userMap.set(id, {
       id: id,
       sessionId: u.sessionId,
       publicKey: u.publicKey,
-      info: u.info,
+      info: {
+        ...u.info,
+        profilePicture: profilePicture,
+      },
       status: "online",
       lastSeen: Date.now(),
     });
@@ -844,7 +977,9 @@ function handleSendFriendRequest(ws, data) {
 
   try {
     // Look up receiver's userId from username
-    const lookupReceiver = db.prepare(`SELECT user_id, username FROM users WHERE username = ?`);
+    const lookupReceiver = db.prepare(
+      `SELECT user_id, username FROM users WHERE username = ?`,
+    );
     const receiverUser = lookupReceiver.get(receiverUsername);
 
     if (!receiverUser) {
@@ -853,7 +988,7 @@ function handleSendFriendRequest(ws, data) {
         JSON.stringify({
           type: "friend_request_error",
           reason: "User not found",
-        })
+        }),
       );
       return;
     }
@@ -861,7 +996,9 @@ function handleSendFriendRequest(ws, data) {
     const now = Date.now();
     // Store both sender_id and receiver_id as userIds
     sendFriendRequest.run(ws.userId, receiverUser.user_id, now, now, now);
-    console.log(`📤 Friend request sent from ${ws.userId} to ${receiverUser.user_id} (${receiverUsername})`);
+    console.log(
+      `📤 Friend request sent from ${ws.userId} to ${receiverUser.user_id} (${receiverUsername})`,
+    );
 
     // Send confirmation back to sender
     ws.send(
@@ -869,22 +1006,25 @@ function handleSendFriendRequest(ws, data) {
         type: "friend_request_sent",
         receiverUsername: receiverUsername,
         receiverId: receiverUser.user_id,
-      })
+      }),
     );
 
     // Notify receiver if they're online - tell them to refresh their requests
     const receiver = connectedUsers.get(receiverUser.user_id);
     if (receiver && receiver.socket.readyState === WebSocket.OPEN) {
       // Get sender's info for the notification
-      const senderInfo = db.prepare(`SELECT username, display_name FROM users WHERE user_id = ?`).get(ws.userId);
+      const senderInfo = db
+        .prepare(`SELECT username, display_name FROM users WHERE user_id = ?`)
+        .get(ws.userId);
 
       receiver.socket.send(
         JSON.stringify({
           type: "friend_request_received",
           senderId: ws.userId,
           senderUsername: senderInfo?.username || ws.userId,
-          senderDisplayName: senderInfo?.display_name || senderInfo?.username || ws.userId,
-        })
+          senderDisplayName:
+            senderInfo?.display_name || senderInfo?.username || ws.userId,
+        }),
       );
     }
   } catch (err) {
@@ -898,17 +1038,22 @@ function handleGetFriendRequests(ws, data) {
 
   try {
     const requests = getPendingFriendRequests.all(ws.userId);
-    console.log(`📥 Retrieved ${requests.length} pending requests for ${ws.userId}`);
+    console.log(
+      `📥 Retrieved ${requests.length} pending requests for ${ws.userId}`,
+    );
 
     // Enrich requests with sender information
-    const enrichedRequests = requests.map(req => {
-      const sender = db.prepare(`SELECT username, display_name FROM users WHERE user_id = ?`).get(req.sender_id);
+    const enrichedRequests = requests.map((req) => {
+      const sender = db
+        .prepare(`SELECT username, display_name FROM users WHERE user_id = ?`)
+        .get(req.sender_id);
       return {
         sender_id: req.sender_id,
         sender_username: sender?.username || req.sender_id,
-        sender_display_name: sender?.display_name || sender?.username || req.sender_id,
+        sender_display_name:
+          sender?.display_name || sender?.username || req.sender_id,
         receiver_id: req.receiver_id,
-        created_at: req.created_at
+        created_at: req.created_at,
       };
     });
 
@@ -916,7 +1061,7 @@ function handleGetFriendRequests(ws, data) {
       JSON.stringify({
         type: "friend_requests_list",
         requests: enrichedRequests,
-      })
+      }),
     );
   } catch (err) {
     console.error("Error getting friend requests:", err.message);
@@ -941,16 +1086,16 @@ function handleAcceptFriendRequest(ws, data) {
       JSON.stringify({
         type: "friend_request_accepted",
         friendId: senderId,
-      })
+      }),
     );
     // Also send updated friends list to acceptor
     const acceptorFriends = getFriendsList.all(ws.userId);
-    const acceptorFriendIds = acceptorFriends.map(f => f.friend_id);
+    const acceptorFriendIds = acceptorFriends.map((f) => f.friend_id);
     ws.send(
       JSON.stringify({
         type: "friends_list",
         friends: acceptorFriendIds,
-      })
+      }),
     );
 
     // Notify original sender if online
@@ -960,16 +1105,16 @@ function handleAcceptFriendRequest(ws, data) {
         JSON.stringify({
           type: "friend_request_accepted",
           friendId: ws.userId,
-        })
+        }),
       );
       // Also send updated friends list to sender
       const senderFriends = getFriendsList.all(senderId);
-      const senderFriendIds = senderFriends.map(f => f.friend_id);
+      const senderFriendIds = senderFriends.map((f) => f.friend_id);
       sender.socket.send(
         JSON.stringify({
           type: "friends_list",
           friends: senderFriendIds,
-        })
+        }),
       );
     }
   } catch (err) {
@@ -992,7 +1137,7 @@ function handleDeclineFriendRequest(ws, data) {
       JSON.stringify({
         type: "friend_request_declined",
         friendId: senderId,
-      })
+      }),
     );
 
     // Notify original sender if online (so they see + button again)
@@ -1002,7 +1147,7 @@ function handleDeclineFriendRequest(ws, data) {
         JSON.stringify({
           type: "friend_request_declined",
           friendId: ws.userId,
-        })
+        }),
       );
     }
   } catch (err) {
@@ -1016,14 +1161,14 @@ function handleGetFriendsList(ws, data) {
 
   try {
     const friends = getFriendsList.all(ws.userId);
-    const friendIds = friends.map(f => f.friend_id);
+    const friendIds = friends.map((f) => f.friend_id);
     console.log(`👥 Retrieved ${friendIds.length} friends for ${ws.userId}`);
 
     ws.send(
       JSON.stringify({
         type: "friends_list",
         friends: friendIds,
-      })
+      }),
     );
   } catch (err) {
     console.error("Error getting friends list:", err.message);
@@ -1036,28 +1181,33 @@ function handleGetSentFriendRequests(ws, data) {
 
   try {
     const requests = getSentFriendRequests.all(ws.userId);
-    console.log(`📤 Retrieved ${requests.length} sent requests for ${ws.userId}`);
+    console.log(
+      `📤 Retrieved ${requests.length} sent requests for ${ws.userId}`,
+    );
 
     // Enrich requests with receiver information
-    const enrichedRequests = requests.map(req => {
-      const receiver = db.prepare(`SELECT username, display_name FROM users WHERE user_id = ?`).get(req.receiver_id);
+    const enrichedRequests = requests.map((req) => {
+      const receiver = db
+        .prepare(`SELECT username, display_name FROM users WHERE user_id = ?`)
+        .get(req.receiver_id);
       return {
         receiver_id: req.receiver_id,
         receiver_username: receiver?.username || req.receiver_id,
-        receiver_display_name: receiver?.display_name || receiver?.username || req.receiver_id,
-        created_at: req.created_at
+        receiver_display_name:
+          receiver?.display_name || receiver?.username || req.receiver_id,
+        created_at: req.created_at,
       };
     });
 
     // Also return just the IDs for backward compatibility
-    const receiverIds = enrichedRequests.map(r => r.receiver_id);
+    const receiverIds = enrichedRequests.map((r) => r.receiver_id);
 
     ws.send(
       JSON.stringify({
         type: "sent_friend_requests_list",
         requests: receiverIds, // Keep for backward compatibility
         requestsDetailed: enrichedRequests, // New detailed format
-      })
+      }),
     );
   } catch (err) {
     console.error("Error getting sent friend requests:", err.message);
@@ -1079,31 +1229,31 @@ function handleUpdateUsername(ws, data) {
       console.log(`✅ Username updated for user ${userId}: ${newUsername}`);
       ws.send(
         JSON.stringify({
-          type: 'username_updated',
+          type: "username_updated",
           success: true,
           userId: userId,
-          newUsername: newUsername
-        })
+          newUsername: newUsername,
+        }),
       );
       broadcastUserList();
     } else {
       console.log(`❌ User ${userId} not found for username update`);
       ws.send(
         JSON.stringify({
-          type: 'username_updated',
+          type: "username_updated",
           success: false,
-          reason: 'User not found'
-        })
+          reason: "User not found",
+        }),
       );
     }
   } catch (err) {
     console.error("Error updating username:", err.message);
     ws.send(
       JSON.stringify({
-        type: 'username_updated',
+        type: "username_updated",
         success: false,
-        reason: 'Database error'
-      })
+        reason: "Database error",
+      }),
     );
   }
 }
@@ -1114,9 +1264,9 @@ function handleUpdateProfilePicture(ws, data) {
   if (!userId || !profilePicture) return;
 
   try {
-    // Update user's profile picture in database
+    // Update user's profile picture in database (using username as identifier)
     const updateStmt = db.prepare(`
-      UPDATE users SET profile_picture = ? WHERE user_id = ?
+      UPDATE users SET profile_picture = ? WHERE username = ?
     `);
     const result = updateStmt.run(profilePicture, userId);
 
@@ -1133,10 +1283,12 @@ function handleUpdateProfilePicture(ws, data) {
       const broadcastData = JSON.stringify({
         type: "profile_picture_updated",
         userId: userId,
-        profilePicture: profilePicture
+        profilePicture: profilePicture,
       });
 
-      console.log(`📡 Broadcasting profile picture update for user ${userId} to ${wss.clients.size} clients`);
+      console.log(
+        `📡 Broadcasting profile picture update for user ${userId} to ${wss.clients.size} clients`,
+      );
 
       for (const client of wss.clients) {
         if (client.readyState === WebSocket.OPEN) {
@@ -1144,30 +1296,32 @@ function handleUpdateProfilePicture(ws, data) {
         }
       }
 
+      // Don't broadcast user list - the profile_picture_updated message is sufficient
+
       // Send confirmation to the user who updated it
       ws.send(
         JSON.stringify({
-          type: 'profile_picture_updated',
+          type: "profile_picture_updated",
           success: true,
-          userId: userId
-        })
+          userId: userId,
+        }),
       );
     } else {
       console.log(`❌ User ${userId} not found for profile picture update`);
       ws.send(
         JSON.stringify({
-          type: 'profile_picture_update_error',
-          reason: 'User not found'
-        })
+          type: "profile_picture_update_error",
+          reason: "User not found",
+        }),
       );
     }
   } catch (err) {
     console.error("Error updating profile picture:", err.message);
     ws.send(
       JSON.stringify({
-        type: 'profile_picture_update_error',
-        reason: 'Database error'
-      })
+        type: "profile_picture_update_error",
+        reason: "Database error",
+      }),
     );
   }
 }
@@ -1188,7 +1342,7 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Server listening on port ${PORT} (all interfaces)`);
   console.log(`📊 Database: ${DB_PATH}`);
 });

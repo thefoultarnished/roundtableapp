@@ -282,18 +282,8 @@ export default function ChatArea() {
                       online.setAuthPassword(authPassword);
                     }
 
-                    // Handle userId based on mode
-                    if (authMode === 'signup') {
-                      // For signup, clear old userId so a new one is generated
-                      localStorage.removeItem('appUserId');
-                      localStorage.removeItem('userId');
-                      console.log('✅ Cleared old userId for new signup');
-                    } else if (authMode === 'login' && validation.userId) {
-                      // For login, store the userId from server
-                      localStorage.setItem('appUserId', validation.userId);
-                      localStorage.setItem('userId', validation.userId);
-                      console.log(`✅ Stored userId for login: ${validation.userId}`);
-                    }
+                    // Username is now the unique ID - no need for separate userId storage
+                    console.log(`✅ Using username as unique ID: ${validation.username}`);
 
                     dispatch({
                       type: 'LOGIN',

@@ -16,6 +16,7 @@ export default function SettingsModal() {
   const [saveStatus, setSaveStatus] = useState('');
   const [theme, setTheme] = useState('light');
   const [profilePicture, setProfilePicture] = useState('');
+  const [savedProfilePicture, setSavedProfilePicture] = useState(''); // Track last saved picture
   const [windowTransparency, setWindowTransparency] = useState(true);
   const [transparencyLevel, setTransparencyLevel] = useState(0.75); // UI Glass
   const [windowOpacity, setWindowOpacity] = useState(0.70); // Main Background
@@ -23,8 +24,8 @@ export default function SettingsModal() {
   useEffect(() => {
     // Sync state from localStorage when settings are opened
     const syncSettings = () => {
-      setDisplayName(localStorage.getItem('displayName') || 'Your Name');
-      const currentUsername = localStorage.getItem('username') || 'RoundtableUser';
+      setDisplayName(state.currentUser?.displayName || localStorage.getItem('displayName') || '');
+      const currentUsername = state.currentUser?.username || localStorage.getItem('username') || '';
       setUsername(currentUsername);
       setAutoDownload(localStorage.getItem('autoDownloadFiles') === 'true');
       setAppFont(localStorage.getItem('appFont') || "'Inter', sans-serif");
@@ -32,9 +33,11 @@ export default function SettingsModal() {
       setFontScale(parseInt(localStorage.getItem('fontSizeScale') || '100'));
       setTheme(localStorage.getItem('theme') || 'aurora');
 
-      // Load profile picture mapped to current username
-      const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
-      setProfilePicture(allProfilePics[currentUsername] || '');
+      // Load profile picture from Redux state (server source of truth)
+      const currentUserData = state.allUsers.find(u => u.username === currentUsername);
+      const picFromServer = currentUserData?.profile_picture || '';
+      setProfilePicture(picFromServer);
+      setSavedProfilePicture(picFromServer);
 
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
@@ -44,59 +47,109 @@ export default function SettingsModal() {
     if (state.settingsOpen) {
       syncSettings();
     }
-  }, [state.settingsOpen]);
+  }, [state.settingsOpen, state.allUsers]);
 
   const closeSettings = () => dispatch({ type: 'SET_SETTINGS_OPEN', payload: false });
 
-  // AUTOSAVE LOGIC: Runs whenever any setting changes
-  useEffect(() => {
-    // Skip initial mount to prevent redundant status flash
-    if (!state.settingsOpen) return;
+  const handleSave = () => {
+    // Persist to localStorage
+    localStorage.setItem('username', username);
+    localStorage.setItem('displayName', displayName);
+    localStorage.setItem('fontSizeScale', fontScale);
+    localStorage.setItem('autoDownloadFiles', autoDownload);
+    localStorage.setItem('appFont', appFont);
+    localStorage.setItem('chatFont', chatFont);
+    localStorage.setItem('windowTransparency', windowTransparency);
+    localStorage.setItem('transparencyLevel', transparencyLevel);
+    localStorage.setItem('windowOpacity', windowOpacity);
+    localStorage.setItem('theme', theme);
 
-    const performSave = () => {
-      // Persist to localStorage
-      localStorage.setItem('username', username);
-      localStorage.setItem('displayName', displayName);
-      localStorage.setItem('fontSizeScale', fontScale);
-      localStorage.setItem('autoDownloadFiles', autoDownload);
-      localStorage.setItem('appFont', appFont);
-      localStorage.setItem('chatFont', chatFont);
-      localStorage.setItem('windowTransparency', windowTransparency);
-      localStorage.setItem('transparencyLevel', transparencyLevel);
-      localStorage.setItem('windowOpacity', windowOpacity);
-      localStorage.setItem('theme', theme);
+    // Update AppContext currentUser
+    dispatch({
+      type: 'LOGIN',
+      payload: { username, displayName }
+    });
 
-      // Update AppContext currentUser
-      dispatch({
-        type: 'LOGIN',
-        payload: { username, displayName }
-      });
+    // Apply Visual CSS Variables
+    document.documentElement.style.setProperty('--app-font', appFont);
+    document.documentElement.style.setProperty('--chat-font', chatFont);
+    document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
+    document.documentElement.style.setProperty('--glass-opacity', transparencyLevel);
 
-      // Apply Visual CSS Variables
-      document.documentElement.style.setProperty('--app-font', appFont);
-      document.documentElement.style.setProperty('--chat-font', chatFont);
-      document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
-      document.documentElement.style.setProperty('--glass-opacity', transparencyLevel);
-      
-      // Apply Theme Classes
-      document.documentElement.classList.remove('dark', 'aurora');
-      if (theme === 'dark') document.documentElement.classList.add('dark');
-      if (theme === 'aurora') document.documentElement.classList.add('aurora');
+    // Apply Theme Classes
+    document.documentElement.classList.remove('dark', 'aurora');
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    if (theme === 'aurora') document.documentElement.classList.add('aurora');
 
-      // Apply Window Background Opacity
-      const root = document.getElementById('root');
-      if (root) {
-        if (windowTransparency) {
-           const isDark = theme === 'dark' || theme === 'aurora';
-           root.style.background = isDark
-              ? `rgba(2, 6, 23, ${windowOpacity})`
-              : `rgba(235, 238, 244, ${windowOpacity})`;
-        } else {
-           const isDark = theme === 'dark' || theme === 'aurora';
-           root.style.background = isDark ? '#020617' : '#e2e8f0';
-        }
+    // Apply Window Background Opacity
+    const root = document.getElementById('root');
+    if (root) {
+      if (windowTransparency) {
+         const isDark = theme === 'dark' || theme === 'aurora';
+         root.style.background = isDark
+            ? `rgba(2, 6, 23, ${windowOpacity})`
+            : `rgba(235, 238, 244, ${windowOpacity})`;
+      } else {
+         const isDark = theme === 'dark' || theme === 'aurora';
+         root.style.background = isDark ? '#020617' : '#e2e8f0';
       }
+    }
 
+    // Check if profile picture changed
+    const profilePicChanged = profilePicture !== savedProfilePicture;
+    if (profilePicChanged && profilePicture) {
+      // Upload to MinIO through server
+      const uploadImage = async () => {
+        try {
+          const userId = localStorage.getItem('username');
+          const serverUrl = localStorage.getItem('relayServerUrl') || 'http://129.154.231.157:8080';
+          const uploadUrl = serverUrl.replace('ws://', 'http://').replace('wss://', 'https://') + '/upload-image';
+          const response = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageData: profilePicture,
+              userId: userId,
+              fileName: `profile-${Date.now()}.png`
+            })
+          });
+
+          const data = await response.json();
+          if (data.success && data.imageUrl) {
+            // Update local state immediately
+            const myUsername = localStorage.getItem('username');
+            dispatch({
+              type: 'UPDATE_USER_PROFILE_PICTURE',
+              payload: {
+                userId: myUsername,
+                profilePicture: data.imageUrl
+              }
+            });
+
+            // Send MinIO URL to server
+            if (online?.sendProfilePictureUpdate) {
+              online.sendProfilePictureUpdate(data.imageUrl);
+            }
+            setSavedProfilePicture(profilePicture);
+            console.log(`✅ Image uploaded to MinIO: ${data.imageUrl}`);
+          } else {
+            console.error('❌ Image upload failed:', data.error);
+          }
+        } catch (err) {
+          console.error('❌ Image upload error:', err);
+        }
+      };
+      uploadImage();
+    }
+
+    // Only announce presence if username or displayName actually changed
+    const prevUsername = localStorage.getItem('username');
+    const prevDisplayName = localStorage.getItem('displayName');
+    const usernameChanged = prevUsername !== username;
+    const displayNameChanged = prevDisplayName !== displayName;
+
+    // Don't broadcast identity for profile pic changes - sendProfilePictureUpdate handles that
+    if (usernameChanged || displayNameChanged) {
       // Send username update to server if in online mode
       if (online?.ws && online.ws.readyState === WebSocket.OPEN) {
         const userId = localStorage.getItem('userId');
@@ -116,19 +169,13 @@ export default function SettingsModal() {
       } else if (announcePresence) {
         announcePresence();
       }
+    }
 
-      // Briefly show saving status
-      setSaveStatus('Auto-Saving...');
-      const timer = setTimeout(() => setSaveStatus(''), 800);
-      return () => clearTimeout(timer);
-    };
-
-    const saveTimer = setTimeout(performSave, 400); // 400ms debounce
-    return () => clearTimeout(saveTimer);
-  }, [
-    displayName, username, autoDownload, appFont, chatFont, 
-    fontScale, theme, windowTransparency, transparencyLevel, windowOpacity
-  ]);
+    // Show save status
+    setSaveStatus('Saved!');
+    const timer = setTimeout(() => setSaveStatus(''), 1500);
+    return () => clearTimeout(timer);
+  };
 
   if (!state.settingsOpen) return null;
 
@@ -143,35 +190,7 @@ export default function SettingsModal() {
         canvas.width = 96; canvas.height = 96;
         canvas.getContext('2d').drawImage(img, 0, 0, 96, 96);
         const resized = canvas.toDataURL('image/png');
-        setProfilePicture(resized);
-
-        // Save to mapped object with username as key
-        const currentUsername = localStorage.getItem('username');
-        if (currentUsername) {
-          const allProfilePics = JSON.parse(localStorage.getItem('profilePictures') || '{}');
-          allProfilePics[currentUsername] = resized;
-          localStorage.setItem('profilePictures', JSON.stringify(allProfilePics));
-        }
-
-        // Also save to profilePicture key for MessageBubble to pick up
-        localStorage.setItem('profilePicture', resized);
-
-        // Trigger a re-render by dispatching a state update
-        // This ensures all components that display the profile picture refresh
-        dispatch({
-          type: 'LOGIN',
-          payload: {
-            username: state.currentUser?.username || localStorage.getItem('username'),
-            displayName: state.currentUser?.displayName || displayName
-          }
-        });
-
-        // Broadcast profile picture update to server if in online mode
-        if (online?.sendProfilePictureUpdate) {
-          online.sendProfilePictureUpdate(resized);
-        }
-
-        announcePresence();
+        setProfilePicture(resized); // Just update local preview, save on Save button click
       };
       img.src = ev.target.result;
     };
@@ -197,14 +216,22 @@ export default function SettingsModal() {
               {saveStatus}
             </span>
           </h2>
-          <button 
-            onClick={closeSettings} 
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-slate-600 dark:text-slate-400 hover:bg-white/20 hover:text-red-500 dark:hover:text-red-400 hover:border-red-500/30 transition-all duration-300 hover:rotate-90 group"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-xs font-bold transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/30"
+            >
+              Save
+            </button>
+            <button
+              onClick={closeSettings}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-slate-600 dark:text-slate-400 hover:bg-white/20 hover:text-red-500 dark:hover:text-red-400 hover:border-red-500/30 transition-all duration-300 hover:rotate-90 group"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
