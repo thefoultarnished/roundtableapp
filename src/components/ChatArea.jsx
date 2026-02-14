@@ -274,8 +274,8 @@ export default function ChatArea() {
                       return;
                     }
 
-                    // Store password in localStorage for identify to use
-                    localStorage.setItem('tempAuthPassword', authPassword);
+                    // Store password in localStorage for session persistence
+                    localStorage.setItem('authPassword', authPassword);
 
                     // Also set password temporarily for immediate use
                     if (online?.setAuthPassword) {

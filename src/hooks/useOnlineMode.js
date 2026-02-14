@@ -236,7 +236,10 @@ export function useOnlineMode(dispatch, getState) {
                 console.log(`🔑 Identifying as [${myId}] on session [${clientSessionId.current}]`);
 
                 // Get password from ref or localStorage
-                let password = authPasswordRef.current || localStorage.getItem('tempAuthPassword');
+                // Use 'authPassword' for persistent session, or 'tempAuthPassword' for backward compatibility
+                let password = authPasswordRef.current ||
+                              localStorage.getItem('authPassword') ||
+                              localStorage.getItem('tempAuthPassword');
 
                 ws.send(JSON.stringify({
                     type: 'identify',
@@ -251,11 +254,8 @@ export function useOnlineMode(dispatch, getState) {
                     }
                 }));
 
-                // Clear temporary password after sending
+                // Clear temporary password after sending (but keep authPassword for session persistence)
                 localStorage.removeItem('tempAuthPassword');
-                authPasswordRef.current = null;
-
-                // Clear password after sending
                 authPasswordRef.current = null;
             } catch (e) {
                 console.error("Identity export failed", e);
