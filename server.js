@@ -840,20 +840,37 @@ function handleSendFriendRequest(ws, data) {
   if (!ws.userId || !receiverUsername) return;
 
   try {
+    // Look up receiver's userId from username
+    const lookupReceiver = db.prepare(`SELECT user_id, username FROM users WHERE username = ?`);
+    const receiverUser = lookupReceiver.get(receiverUsername);
+
+    if (!receiverUser) {
+      console.log(`❌ User not found: ${receiverUsername}`);
+      ws.send(
+        JSON.stringify({
+          type: "friend_request_error",
+          reason: "User not found",
+        })
+      );
+      return;
+    }
+
     const now = Date.now();
-    sendFriendRequest.run(ws.userId, receiverUsername, now, now, now);
-    console.log(`📤 Friend request sent from ${ws.userId} to ${receiverUsername}`);
+    // Store both sender_id and receiver_id as userIds
+    sendFriendRequest.run(ws.userId, receiverUser.user_id, now, now, now);
+    console.log(`📤 Friend request sent from ${ws.userId} to ${receiverUser.user_id} (${receiverUsername})`);
 
     // Send confirmation back to sender
     ws.send(
       JSON.stringify({
         type: "friend_request_sent",
         receiverUsername: receiverUsername,
+        receiverId: receiverUser.user_id,
       })
     );
 
-    // Notify receiver if they're online
-    const receiver = connectedUsers.get(receiverUsername);
+    // Notify receiver if they're online (using userId, not username)
+    const receiver = connectedUsers.get(receiverUser.user_id);
     if (receiver && receiver.socket.readyState === WebSocket.OPEN) {
       receiver.socket.send(
         JSON.stringify({
@@ -876,10 +893,22 @@ function handleGetFriendRequests(ws, data) {
     const requests = getPendingFriendRequests.all(ws.userId);
     console.log(`📥 Retrieved ${requests.length} pending requests for ${ws.userId}`);
 
+    // Enrich requests with sender information
+    const enrichedRequests = requests.map(req => {
+      const sender = db.prepare(`SELECT username, display_name FROM users WHERE user_id = ?`).get(req.sender_id);
+      return {
+        sender_id: req.sender_id,
+        sender_username: sender?.username || req.sender_id,
+        sender_display_name: sender?.display_name || sender?.username || req.sender_id,
+        receiver_id: req.receiver_id,
+        created_at: req.created_at
+      };
+    });
+
     ws.send(
       JSON.stringify({
         type: "friend_requests_list",
-        requests: requests,
+        requests: enrichedRequests,
       })
     );
   } catch (err) {
@@ -1000,13 +1029,27 @@ function handleGetSentFriendRequests(ws, data) {
 
   try {
     const requests = getSentFriendRequests.all(ws.userId);
-    const receiverIds = requests.map(r => r.receiver_id);
-    console.log(`📤 Retrieved ${receiverIds.length} sent requests for ${ws.userId}`);
+    console.log(`📤 Retrieved ${requests.length} sent requests for ${ws.userId}`);
+
+    // Enrich requests with receiver information
+    const enrichedRequests = requests.map(req => {
+      const receiver = db.prepare(`SELECT username, display_name FROM users WHERE user_id = ?`).get(req.receiver_id);
+      return {
+        receiver_id: req.receiver_id,
+        receiver_username: receiver?.username || req.receiver_id,
+        receiver_display_name: receiver?.display_name || receiver?.username || req.receiver_id,
+        created_at: req.created_at
+      };
+    });
+
+    // Also return just the IDs for backward compatibility
+    const receiverIds = enrichedRequests.map(r => r.receiver_id);
 
     ws.send(
       JSON.stringify({
         type: "sent_friend_requests_list",
-        requests: receiverIds,
+        requests: receiverIds, // Keep for backward compatibility
+        requestsDetailed: enrichedRequests, // New detailed format
       })
     );
   } catch (err) {

@@ -421,21 +421,24 @@ export default function Sidebar() {
             ) : (
               pendingRequests.map((request) => {
                 const senderId = request.sender_id;
-                const user = state.allUsers.find(u => u.id === senderId || u.username === senderId);
+                // Use enriched data from server if available, otherwise fallback to allUsers lookup
+                const senderUsername = request.sender_username || senderId;
+                const senderDisplayName = request.sender_display_name || request.sender_username || senderId;
+                const user = state.allUsers.find(u => u.id === senderId || u.username === senderUsername);
                 return (
                   <div key={senderId} className="flex items-center gap-3 p-3 rounded-lg bg-white/10 border border-white/10 hover:bg-white/15 transition-all">
                     <div className="flex-shrink-0">
                       {user?.profile_picture ? (
-                        <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover" alt={user?.name} />
+                        <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover" alt={senderDisplayName} />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm">
-                          {user?.name?.charAt(0).toUpperCase() || '?'}
+                          {senderDisplayName?.charAt(0).toUpperCase() || '?'}
                         </div>
                       )}
                     </div>
                     <div className="flex-grow min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{user?.name || senderId}</p>
-                      <p className="text-xs text-slate-500">@{user?.username || senderId}</p>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{senderDisplayName}</p>
+                      <p className="text-xs text-slate-500">@{senderUsername}</p>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
                       <button
