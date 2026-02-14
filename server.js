@@ -295,6 +295,9 @@ function handleMessage(ws, data) {
     case "get_sent_friend_requests":
       handleGetSentFriendRequests(ws, data);
       break;
+    case "update_username":
+      handleUpdateUsername(ws, data);
+      break;
     default:
       console.log("Unknown message type:", data.type);
   }
@@ -403,6 +406,7 @@ function handleValidateAuth(ws, data) {
             valid: true,
             mode: "login",
             username: username,
+            userId: existing.user_id,
           }),
         );
       }
@@ -535,8 +539,8 @@ function handleIdentify(ws, data) {
     console.error("Failed to retrieve pending messages:", err);
   }
 
-  // Notify user they are registered
-  ws.send(JSON.stringify({ type: "registered", success: true }));
+  // Notify user they are registered and send their user_id
+  ws.send(JSON.stringify({ type: "registered", success: true, userId: userId }));
 
   // Update everyone else
   broadcastUserList();
@@ -1007,6 +1011,50 @@ function handleGetSentFriendRequests(ws, data) {
     );
   } catch (err) {
     console.error("Error getting sent friend requests:", err.message);
+  }
+}
+
+// Handle Update Username
+function handleUpdateUsername(ws, data) {
+  const { userId, newUsername } = data;
+  if (!userId || !newUsername) return;
+
+  try {
+    const updateStmt = db.prepare(`
+      UPDATE users SET username = ? WHERE user_id = ?
+    `);
+    const result = updateStmt.run(newUsername, userId);
+
+    if (result.changes > 0) {
+      console.log(`✅ Username updated for user ${userId}: ${newUsername}`);
+      ws.send(
+        JSON.stringify({
+          type: 'username_updated',
+          success: true,
+          userId: userId,
+          newUsername: newUsername
+        })
+      );
+      broadcastUserList();
+    } else {
+      console.log(`❌ User ${userId} not found for username update`);
+      ws.send(
+        JSON.stringify({
+          type: 'username_updated',
+          success: false,
+          reason: 'User not found'
+        })
+      );
+    }
+  } catch (err) {
+    console.error("Error updating username:", err.message);
+    ws.send(
+      JSON.stringify({
+        type: 'username_updated',
+        success: false,
+        reason: 'Database error'
+      })
+    );
   }
 }
 

@@ -235,18 +235,25 @@ export function useOnlineMode(dispatch, getState) {
 
                 console.log(`🔑 Identifying as [${myId}] on session [${clientSessionId.current}]`);
 
+                // Get password from ref or localStorage
+                let password = authPasswordRef.current || localStorage.getItem('tempAuthPassword');
+
                 ws.send(JSON.stringify({
                     type: 'identify',
                     userId: myId,
-                    sessionId: clientSessionId.current, // Add persistent session tracking
+                    sessionId: clientSessionId.current,
                     publicKey: pubKeyJwk,
-                    password: authPasswordRef.current, // Include password if set during signup
+                    password: password, // Include password for signup/initial login
                     info: {
                         name: name,
                         username: myUsername,
                         profilePicture: profilePicture
                     }
                 }));
+
+                // Clear temporary password after sending
+                localStorage.removeItem('tempAuthPassword');
+                authPasswordRef.current = null;
 
                 // Clear password after sending
                 authPasswordRef.current = null;
@@ -631,6 +638,14 @@ export function useOnlineMode(dispatch, getState) {
 
             case 'registered': {
                 console.log('✅ Registered with server, syncing friend data...');
+
+                // Store userId from server
+                if (data.userId) {
+                    localStorage.setItem('appUserId', data.userId);
+                    localStorage.setItem('userId', data.userId); // Keep for compatibility
+                    console.log(`✅ Stored userId from registration: ${data.userId}`);
+                }
+
                 // Sync friend state from server on login
                 setTimeout(() => {
                     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

@@ -97,6 +97,19 @@ export default function SettingsModal() {
         }
       }
 
+      // Send username update to server if in online mode
+      if (online?.ws && online.ws.readyState === WebSocket.OPEN) {
+        const userId = localStorage.getItem('userId');
+        if (userId && username) {
+          online.ws.send(JSON.stringify({
+            type: 'update_username',
+            userId: userId,
+            newUsername: username
+          }));
+          console.log(`📤 Sent username update to server: ${username}`);
+        }
+      }
+
       // Announce presence changes to server (for online mode)
       if (online?.broadcastIdentity) {
         online.broadcastIdentity();

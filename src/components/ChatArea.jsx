@@ -274,9 +274,25 @@ export default function ChatArea() {
                       return;
                     }
 
-                    // Auth is valid, set password temporarily and proceed with login
+                    // Store password in localStorage for identify to use
+                    localStorage.setItem('tempAuthPassword', authPassword);
+
+                    // Also set password temporarily for immediate use
                     if (online?.setAuthPassword) {
                       online.setAuthPassword(authPassword);
+                    }
+
+                    // Handle userId based on mode
+                    if (authMode === 'signup') {
+                      // For signup, clear old userId so a new one is generated
+                      localStorage.removeItem('appUserId');
+                      localStorage.removeItem('userId');
+                      console.log('✅ Cleared old userId for new signup');
+                    } else if (authMode === 'login' && validation.userId) {
+                      // For login, store the userId from server
+                      localStorage.setItem('appUserId', validation.userId);
+                      localStorage.setItem('userId', validation.userId);
+                      console.log(`✅ Stored userId for login: ${validation.userId}`);
                     }
 
                     dispatch({

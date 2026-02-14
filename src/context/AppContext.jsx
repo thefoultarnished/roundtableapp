@@ -173,6 +173,8 @@ function appReducer(state, action) {
       localStorage.removeItem('displayName');
       localStorage.removeItem('profilePicture');
       localStorage.removeItem('userId'); // Clear old random userId
+      localStorage.removeItem('appUserId'); // Clear persistent user ID
+      localStorage.removeItem('tempAuthPassword'); // Clear any stored password
       return {
         ...state,
         currentUser: null,
