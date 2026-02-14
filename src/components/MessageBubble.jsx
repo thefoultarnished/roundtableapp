@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import * as utils from '../utils';
 
-export default function MessageBubble({ message }) {
+function MessageBubble({ message }) {
   const { state } = useAppContext();
   const isSentByMe = message.sender === 'me';
   const animClass = isSentByMe ? 'slide-in-right' : 'slide-in-left';
@@ -41,12 +41,15 @@ export default function MessageBubble({ message }) {
     return <FileTransferBubble message={message} isSentByMe={isSentByMe} animClass={animClass} />;
   }
 
-  const senderUser = isSentByMe ? null : state.allUsers.find(u => u.id === message.sender);
-  const myProfilePicture = localStorage.getItem('profilePicture');
+  const senderUser = useMemo(() =>
+    isSentByMe ? null : state.allUsers.find(u => u.id === message.sender),
+    [isSentByMe, message.sender, state.allUsers]
+  );
+  const myProfilePicture = useMemo(() => localStorage.getItem('profilePicture'), []);
 
   // Glass message style
-  const sentStyle = 'bg-gradient-to-br from-teal-500/90 to-cyan-600/90 text-white shadow-lg shadow-teal-500/15 backdrop-blur-sm';
-  const receivedStyle = 'bg-white/50 dark:bg-white/10 text-slate-800 dark:text-slate-100 border border-white/30 dark:border-white/10 shadow-lg backdrop-blur-md';
+  const sentStyle = 'bg-gradient-to-br from-teal-500/90 to-cyan-600/90 text-white shadow-lg shadow-teal-500/15';
+  const receivedStyle = 'bg-white/50 dark:bg-white/10 text-slate-800 dark:text-slate-100 border border-white/30 dark:border-white/10 shadow-lg';
   const messageColor = isSentByMe ? sentStyle : receivedStyle;
   const timestampColor = isSentByMe ? 'text-cyan-50/70' : 'text-slate-500 dark:text-slate-400';
 
@@ -76,7 +79,7 @@ export default function MessageBubble({ message }) {
 
   return (
     <div className={`message-bubble flex w-full ${isSentByMe ? 'justify-end' : 'justify-start'} my-1`}>
-      <div className={`flex items-end gap-2 max-w-[80%] ${animClass}`}>
+      <div className={`flex items-end gap-2 max-w-[80%]`} style={{ willChange: 'transform' }}>
         {!isSentByMe && senderAvatar}
         <div className="flex-1 min-w-0">
           <div className={`px-4 py-2 ${isSentByMe ? 'pr-24' : 'pr-16'} relative rounded-2xl ${messageColor} ${isSentByMe ? 'rounded-br-md' : 'rounded-bl-md'} transition-all duration-300 hover:shadow-xl`}>
@@ -168,3 +171,5 @@ function FileTransferBubble({ message, isSentByMe, animClass }) {
     </div>
   );
 }
+
+export default React.memo(MessageBubble);

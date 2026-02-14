@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import MessageBubble from './MessageBubble';
 import { useNetwork } from '../hooks/useNetwork';
@@ -27,7 +27,7 @@ export default function ChatArea() {
 
   const activeUser = state.allUsers.find(u => u.id === state.activeChatUserId);
   const userMessages = state.activeChatUserId ? (state.messages[state.activeChatUserId] || []) : [];
-  const groupedMessages = utils.groupMessagesByDate(userMessages);
+  const groupedMessages = useMemo(() => utils.groupMessagesByDate(userMessages), [userMessages]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
