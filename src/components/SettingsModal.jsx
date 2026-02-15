@@ -49,11 +49,12 @@ export default function SettingsModal() {
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
       setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
 
-      // Load crypto keys for testing
+      // Load crypto keys for testing (use same source as decryption)
       try {
-        if (currentUsername) {
-          const pubKeyStr = localStorage.getItem(`keys_${currentUsername}_pub`);
-          const privKeyStr = localStorage.getItem(`keys_${currentUsername}_priv`);
+        const keyUsername = localStorage.getItem('username'); // Same as useOnlineMode
+        if (keyUsername) {
+          const pubKeyStr = localStorage.getItem(`keys_${keyUsername}_pub`);
+          const privKeyStr = localStorage.getItem(`keys_${keyUsername}_priv`);
           if (pubKeyStr) {
             setPublicKeyJwk(JSON.parse(pubKeyStr));
           } else {

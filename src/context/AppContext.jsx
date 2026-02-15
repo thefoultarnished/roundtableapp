@@ -1,7 +1,16 @@
-import React, { createContext, useContext, useReducer, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useRef, useEffect } from 'react';
 import { useOnlineMode } from '../hooks/useOnlineMode';
 import { useProfilePictureSync } from '../hooks/useProfilePictureSync';
 import { setCachedProfilePic, clearAllProfilePicCaches } from '../utils/profilePictureCache';
+import {
+  loadAllMessages,
+  loadAllFriends,
+  saveMessage,
+  saveFriend,
+  loadConversationMetadata,
+  updateConversationMetadata,
+  clearAllData
+} from '../utils/indexedDB';
 
 const AppContext = createContext(null);
 
@@ -197,6 +206,9 @@ function appReducer(state, action) {
       // localStorage.removeItem('privKey');
       // localStorage.removeItem('pubKey');
 
+      // Clear IndexedDB cache
+      clearAllData().catch(err => console.error('Failed to clear IndexedDB:', err));
+
       // Clear all profile picture caches
       clearAllProfilePicCaches();
 
@@ -290,6 +302,9 @@ function appReducer(state, action) {
 
     case 'SET_MESSAGES':
       return { ...state, messages: action.payload };
+
+    case 'SET_UNREAD_COUNTS':
+      return { ...state, unreadCounts: action.payload };
 
     case 'SET_SELECTED_FILES':
       return { ...state, selectedFiles: action.payload };
@@ -429,6 +444,130 @@ export function AppProvider({ children }) {
 
   // Sync profile pictures on app launch
   useProfilePictureSync(dispatch, state.allUsers, online?.isOnline);
+
+  // Load cached data from IndexedDB on mount
+  useEffect(() => {
+    const loadCachedData = async () => {
+      try {
+        console.log('📂 Loading cached data from IndexedDB...');
+
+        // Load messages
+        const cachedMessages = await loadAllMessages();
+        if (Object.keys(cachedMessages).length > 0) {
+          console.log(`📨 Loaded ${Object.keys(cachedMessages).length} conversations from cache`);
+          // Merge with existing placeholder messages
+          const mergedMessages = { ...initialState.messages, ...cachedMessages };
+          dispatch({
+            type: 'SET_MESSAGES',
+            payload: mergedMessages
+          });
+        }
+
+        // Load friends
+        const cachedFriends = await loadAllFriends();
+        if (cachedFriends.length > 0) {
+          console.log(`👥 Loaded ${cachedFriends.length} friends from cache`);
+          dispatch({ type: 'SET_ALL_USERS', payload: cachedFriends });
+        }
+
+        // Load conversation metadata (unread counts, last message times)
+        const metadata = await loadConversationMetadata();
+        if (Object.keys(metadata).length > 0) {
+          console.log(`💬 Loaded metadata for ${Object.keys(metadata).length} conversations`);
+          // Update unread counts
+          const unreadCounts = {};
+          Object.keys(metadata).forEach(friendId => {
+            unreadCounts[friendId] = metadata[friendId].unreadCount || 0;
+          });
+          dispatch({ type: 'SET_UNREAD_COUNTS', payload: unreadCounts });
+        }
+
+        console.log('✅ Cache loading complete');
+      } catch (err) {
+        console.error('❌ Failed to load cached data:', err);
+      }
+    };
+
+    loadCachedData();
+  }, []); // Only run once on mount
+
+  // Save messages to IndexedDB when they change
+  useEffect(() => {
+    const saveMessagesToCache = async () => {
+      try {
+        // Save each conversation's messages
+        for (const [friendId, messages] of Object.entries(state.messages)) {
+          if (messages.length > 0 && friendId !== 'placeholder-aemeath' && friendId !== 'placeholder-qiuyuan') {
+            // Save each message individually (IndexedDB will handle duplicates with keyPath)
+            for (const msg of messages) {
+              await saveMessage({
+                ...msg,
+                friendId: friendId
+              }).catch(() => {}); // Ignore duplicate key errors
+            }
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to save messages to cache:', err);
+      }
+    };
+
+    // Debounce saves to avoid performance issues
+    const timer = setTimeout(saveMessagesToCache, 500);
+    return () => clearTimeout(timer);
+  }, [state.messages]);
+
+  // Save friends to IndexedDB when they change
+  useEffect(() => {
+    const saveFriendsToCache = async () => {
+      try {
+        if (state.allUsers.length > 0) {
+          // Filter out placeholder users
+          const realUsers = state.allUsers.filter(
+            u => !u.id?.startsWith('placeholder-')
+          );
+          if (realUsers.length > 0) {
+            for (const friend of realUsers) {
+              await saveFriend({
+                userId: friend.id || friend.username,
+                username: friend.username,
+                displayName: friend.name,
+                profilePicture: friend.profile_picture,
+                status: friend.status
+              }).catch(() => {}); // Ignore errors
+            }
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to save friends to cache:', err);
+      }
+    };
+
+    // Debounce saves
+    const timer = setTimeout(saveFriendsToCache, 500);
+    return () => clearTimeout(timer);
+  }, [state.allUsers]);
+
+  // Save conversation metadata when unread counts change
+  useEffect(() => {
+    const saveMetadata = async () => {
+      try {
+        for (const [friendId, count] of Object.entries(state.unreadCounts)) {
+          if (friendId !== 'placeholder-aemeath') {
+            await updateConversationMetadata(friendId, {
+              unreadCount: count,
+              lastMessageTime: Date.now()
+            }).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to save conversation metadata:', err);
+      }
+    };
+
+    const timer = setTimeout(saveMetadata, 500);
+    return () => clearTimeout(timer);
+  }, [state.unreadCounts]);
 
   return (
     <AppContext.Provider value={{ state, dispatch, getState, online }}>

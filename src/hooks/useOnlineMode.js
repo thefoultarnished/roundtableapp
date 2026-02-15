@@ -560,6 +560,14 @@ export function useOnlineMode(dispatch, getState) {
 
                                 if (sharedKey) {
                                     try {
+                                        // DEBUG: Print keys being used for decryption
+                                        if (keyPair && keyPair.privateKey) {
+                                            exportKey(keyPair.privateKey).then(jwk => {
+                                                console.log("🔑 Decryption Attempt - Private Key:", JSON.stringify(jwk));
+                                            });
+                                        }
+                                        console.log("🔑 Decryption Attempt - Shared Key:", sharedKey);
+
                                         decryptedText = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
                                     } catch (decErr) {
                                         console.warn("⚠️ Cannot decrypt message from history (keys may have changed):", decErr.message);
