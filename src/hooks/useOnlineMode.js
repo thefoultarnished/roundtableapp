@@ -88,9 +88,10 @@ export function useOnlineMode(dispatch, getState) {
             let keys;
 
             if (!storedPassword || !username) {
-                // No login yet - can't initialize keys
+                // No login yet - can't initialize keys, but still need to connect to relay
                 console.log("⏸️  No credentials available, skipping key initialization");
                 setIsInitialized(true);
+                checkConnection(false); // Connect to relay even without keys
                 return;
             }
 
@@ -143,13 +144,8 @@ export function useOnlineMode(dispatch, getState) {
                 if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
                     return;
                 }
-                
-                if (!keysAreReady && !keyPair) {
-                     console.log("⏳ Keys not yet ready, delaying connection...");
-                     return;
-                }
 
-                console.log("🚀 Keys ready, connecting to relay...");
+                console.log("🚀 Connecting to relay...");
                 connect(url);
             } else {
                 if (wsRef.current) {
@@ -972,52 +968,67 @@ export function useOnlineMode(dispatch, getState) {
 
     const validateUsername = useCallback((username, password, mode) => {
         return new Promise((resolve) => {
-            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-                console.warn('⚠️ Not connected to server, rejecting auth');
-                resolve({ valid: false, reason: 'Not connected to server' });
-                return;
-            }
-
-            // Set up a one-time listener for the validation response
-            const originalOnmessage = wsRef.current.onmessage;
-            const validationHandler = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'auth_validation') {
-                        // Restore original handler
-                        wsRef.current.onmessage = originalOnmessage;
-
-                        console.log(`✅ Auth validation response:`, data);
-                        resolve(data);
-
-                        // Re-trigger the original message handler for this message if needed
-                        if (handleServerMessageRef.current) {
-                            handleServerMessageRef.current(data);
-                        }
-                    }
-                } catch (e) {
-                    console.error("Error parsing validation response:", e);
+            // Wait for connection to be ready, with retries
+            const checkConnection = (retries = 0) => {
+                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                    // Connection is ready, proceed with validation
+                    sendValidation();
+                } else if (retries < 30) {
+                    // Retry every 100ms for up to 3 seconds
+                    console.log(`⏳ Waiting for server connection... (attempt ${retries + 1}/30)`);
+                    setTimeout(() => checkConnection(retries + 1), 100);
+                } else {
+                    console.warn('❌ Server connection timeout');
+                    resolve({ valid: false, reason: 'Server connection timeout - please check relay server URL' });
                 }
             };
 
-            wsRef.current.onmessage = validationHandler;
+            const sendValidation = () => {
+                // Set up a one-time listener for the validation response
+                const originalOnmessage = wsRef.current.onmessage;
+                const validationHandler = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'auth_validation') {
+                            // Restore original handler
+                            wsRef.current.onmessage = originalOnmessage;
 
-            // Send validation request
-            wsRef.current.send(JSON.stringify({
-                type: 'validate_auth',
-                username: username,
-                password: password,
-                mode: mode || 'signup'
-            }));
+                            console.log(`✅ Auth validation response:`, data);
+                            resolve(data);
 
-            // Timeout after 5 seconds
-            setTimeout(() => {
-                if (wsRef.current && wsRef.current.onmessage === validationHandler) {
-                    console.warn('⚠️ Validation timeout');
-                    wsRef.current.onmessage = originalOnmessage;
-                    resolve({ valid: false, reason: 'Validation timeout' });
-                }
-            }, 5000);
+                            // Re-trigger the original message handler for this message if needed
+                            if (handleServerMessageRef.current) {
+                                handleServerMessageRef.current(data);
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error parsing validation response:", e);
+                    }
+                };
+
+                wsRef.current.onmessage = validationHandler;
+
+                // Send validation request
+                wsRef.current.send(JSON.stringify({
+                    type: 'validate_auth',
+                    username: username,
+                    password: password,
+                    mode: mode || 'signup'
+                }));
+
+                console.log(`📤 Sent auth validation request for: ${username}`);
+
+                // Timeout after 5 seconds
+                setTimeout(() => {
+                    if (wsRef.current && wsRef.current.onmessage === validationHandler) {
+                        console.warn('⚠️ Validation timeout');
+                        wsRef.current.onmessage = originalOnmessage;
+                        resolve({ valid: false, reason: 'Validation timeout' });
+                    }
+                }, 5000);
+            };
+
+            checkConnection();
         });
     }, []);
 
