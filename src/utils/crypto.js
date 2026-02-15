@@ -1,4 +1,6 @@
 // --- Crypto Utilities for E2EE ---
+import { p256 } from '@noble/curves/nist.js';
+
 const ALGO_KEY = { name: "ECDH", namedCurve: "P-256" };
 const ALGO_ENC = { name: "AES-GCM", length: 256 };
 
@@ -107,4 +109,105 @@ export async function decryptMessage(iv, cipher, key) {
 
     const decoder = new TextDecoder();
     return decoder.decode(decrypted);
+}
+
+/**
+ * Helper function to convert ArrayBuffer to base64url.
+ * Used for converting binary key material to JWK format.
+ * @param {ArrayBuffer|Uint8Array} buffer - The buffer to convert.
+ * @returns {string} - The base64url-encoded string.
+ */
+function arrayBufferToBase64Url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/**
+ * Derive a deterministic P-256 ECDH key pair from username and password.
+ * Same username + password = same keys = consistent message decryption across devices.
+ *
+ * Uses PBKDF2 + SHA-256 to derive a deterministic private key, then @noble/curves to compute the public key.
+ *
+ * @param {string} username - The username (used as salt for determinism)
+ * @param {string} password - The password (key material)
+ * @returns {Promise<{publicKey: CryptoKey, privateKey: CryptoKey}>} - Deterministic ECDH key pair
+ * @throws {Error} - If key derivation fails
+ */
+export async function deriveKeyPairFromPassword(username, password) {
+    const encoder = new TextEncoder();
+
+    try {
+        // Use username as salt (deterministic, unique per user)
+        const salt = encoder.encode(username);
+
+        // Import password as base key for PBKDF2
+        const baseKey = await window.crypto.subtle.importKey(
+            'raw',
+            encoder.encode(password),
+            { name: 'PBKDF2' },
+            false,
+            ['deriveBits']
+        );
+
+        // Derive 256 bits (32 bytes) for private key seed using PBKDF2
+        const derivedBits = await window.crypto.subtle.deriveBits(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000,  // High iteration count for security
+                hash: 'SHA-256'
+            },
+            baseKey,
+            256  // 256 bits
+        );
+
+        // Convert to Uint8Array
+        const privateKeyBytes = new Uint8Array(derivedBits);
+
+        // Use @noble/curves to compute the P-256 public key from the private key
+        const publicKeyUncompressed = p256.getPublicKey(privateKeyBytes, false); // uncompressed: 0x04 + X + Y
+
+        // Extract X and Y coordinates (each 32 bytes, starting after 0x04 prefix)
+        const xCoord = publicKeyUncompressed.slice(1, 33);
+        const yCoord = publicKeyUncompressed.slice(33, 65);
+
+        // Import private key as P-256 JWK with computed public key coordinates
+        const privateKey = await window.crypto.subtle.importKey(
+            'jwk',
+            {
+                kty: 'EC',
+                crv: 'P-256',
+                d: arrayBufferToBase64Url(privateKeyBytes),
+                x: arrayBufferToBase64Url(xCoord),
+                y: arrayBufferToBase64Url(yCoord),
+                ext: true
+            },
+            { name: 'ECDH', namedCurve: 'P-256' },
+            true,
+            ['deriveKey', 'deriveBits']
+        );
+
+        // Import public key separately
+        const publicKey = await window.crypto.subtle.importKey(
+            'jwk',
+            {
+                kty: 'EC',
+                crv: 'P-256',
+                x: arrayBufferToBase64Url(xCoord),
+                y: arrayBufferToBase64Url(yCoord),
+                ext: true
+            },
+            { name: 'ECDH', namedCurve: 'P-256' },
+            true,
+            []
+        );
+
+        return { privateKey, publicKey };
+    } catch (e) {
+        throw new Error(`Failed to derive key pair from password: ${e.message}`);
+    }
 }

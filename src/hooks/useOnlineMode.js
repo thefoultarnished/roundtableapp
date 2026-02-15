@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 // Note: We might need to ensure correct relative path import
 // Assuming src/utils/crypto.js exists
 import { isWindowFocused } from '../utils';
-import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage } from '../utils/crypto';
+import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage, deriveKeyPairFromPassword } from '../utils/crypto';
 import { setCachedProfilePic } from '../utils/profilePictureCache';
 
 export function useOnlineMode(dispatch, getState) {
@@ -82,29 +82,29 @@ export function useOnlineMode(dispatch, getState) {
     // Initialize Keys, Check Connection, and Listen for Changes
     useEffect(() => {
         async function init() {
-            // Keys
-            const storedPriv = localStorage.getItem('privKey');
-            const storedPub = localStorage.getItem('pubKey');
+            // Derive deterministic keys from password
+            const storedPassword = localStorage.getItem('authPassword');
+            const username = localStorage.getItem('username');
             let keys;
 
-            try {
-                if (storedPriv && storedPub) {
-                    const privateKey = await importPrivateKey(JSON.parse(storedPriv));
-                    const publicKey = await importPublicKey(JSON.parse(storedPub));
-                    keys = { privateKey, publicKey };
-                    console.log("Loaded E2EE Keys from Storage");
-                } else {
-                    throw new Error("Keys missing");
-                }
-            } catch (e) {
-                console.log("Generating new E2EE Key Pair...");
-                keys = await generateKeyPair();
-                const privJwk = await exportKey(keys.privateKey);
-                const pubJwk = await exportKey(keys.publicKey);
-                localStorage.setItem('privKey', JSON.stringify(privJwk));
-                localStorage.setItem('pubKey', JSON.stringify(pubJwk));
+            if (!storedPassword || !username) {
+                // No login yet - can't initialize keys
+                console.log("⏸️  No credentials available, skipping key initialization");
+                setIsInitialized(true);
+                return;
             }
-            
+
+            try {
+                // Derive deterministic keys from username + password
+                keys = await deriveKeyPairFromPassword(username, storedPassword);
+                console.log("✅ Derived deterministic keys from password");
+            } catch (e) {
+                console.error("❌ Failed to derive keys from password:", e);
+                alert("Failed to generate encryption keys. Please try logging in again.");
+                setIsInitialized(true);
+                return;
+            }
+
             setKeyPair(keys);
 
             // Load cached peer keys
@@ -259,21 +259,38 @@ export function useOnlineMode(dispatch, getState) {
     }, [ws, keyPair]);
 
     const sendIdentifyWithPassword = useCallback(async () => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN || !keyPair) {
-            console.warn('❌ Cannot send identify: not ready');
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+            console.warn('❌ Cannot send identify: WebSocket not ready');
             return;
         }
 
         const myUsername = localStorage.getItem('username');
-        if (!myUsername) {
-            console.warn('❌ No username found');
+        const storedPassword = localStorage.getItem('authPassword');
+
+        if (!myUsername || !storedPassword) {
+            console.warn('❌ No username or password found');
             return;
         }
 
+        let currentKeyPair = keyPair;
+
+        // If keyPair doesn't exist, derive it from password
+        if (!currentKeyPair) {
+            console.log(`⏳ KeyPair not ready, deriving from password for [${myUsername}]...`);
+            try {
+                currentKeyPair = await deriveKeyPairFromPassword(myUsername, storedPassword);
+                setKeyPair(currentKeyPair);
+                console.log("✅ Derived keys on-demand for identify");
+            } catch (e) {
+                console.error('❌ Failed to derive keys on-demand:', e);
+                return;
+            }
+        }
+
         try {
-            const pubKeyJwk = await exportKey(keyPair.publicKey);
+            const pubKeyJwk = await exportKey(currentKeyPair.publicKey);
             const name = localStorage.getItem('displayName') || myUsername;
-            const password = authPasswordRef.current || localStorage.getItem('authPassword');
+            const password = authPasswordRef.current || storedPassword;
 
             console.log(`🔑 Sending identify with password for [${myUsername}]`);
 

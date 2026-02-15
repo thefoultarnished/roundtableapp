@@ -322,6 +322,7 @@ export default function ChatArea() {
                       // Store username and password for identify
                       localStorage.setItem('username', authUsername.trim());
                       localStorage.setItem('displayName', authDisplayName.trim());
+                      localStorage.setItem('authPassword', authPassword);
 
                       // Store password temporarily for identify
                       if (online?.setAuthPassword) {
