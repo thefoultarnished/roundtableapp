@@ -317,10 +317,11 @@ export default function ChatArea() {
 
                     if (authMode === 'signup') {
                       // SIGNUP FLOW: Don't auto-login, wait for server confirmation
-                      console.log(`📝 Signup initiated for: ${authUsername.trim()}`);
+                      const lowercaseUsername = authUsername.toLowerCase().trim();
+                      console.log(`📝 Signup initiated for: ${lowercaseUsername}`);
 
-                      // Store username and password for identify
-                      localStorage.setItem('username', authUsername.trim());
+                      // Store username and password for identify (lowercase)
+                      localStorage.setItem('username', lowercaseUsername);
                       localStorage.setItem('displayName', authDisplayName.trim());
                       localStorage.setItem('authPassword', authPassword);
 
@@ -340,7 +341,8 @@ export default function ChatArea() {
                       // Don't clear form yet - wait for confirmation
                     } else {
                       // LOGIN FLOW: Proceed normally
-                      console.log(`🔑 Login initiated for: ${authUsername.trim()}`);
+                      const lowercaseUsername = authUsername.toLowerCase().trim();
+                      console.log(`🔑 Login initiated for: ${lowercaseUsername}`);
 
                       // Store password in localStorage for session persistence
                       localStorage.setItem('authPassword', authPassword);
@@ -353,8 +355,8 @@ export default function ChatArea() {
                       dispatch({
                         type: 'LOGIN',
                         payload: {
-                          username: authUsername.trim(),
-                          displayName: authUsername.trim()
+                          username: lowercaseUsername,
+                          displayName: lowercaseUsername
                         }
                       });
 
