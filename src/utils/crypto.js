@@ -142,7 +142,7 @@ export async function deriveKeyPairFromPassword(username, password) {
 
     try {
         // Use username as salt (deterministic, unique per user)
-        const salt = encoder.encode(username);
+        const salt = encoder.encode(username.toLowerCase());
 
         // Import password as base key for PBKDF2
         const baseKey = await window.crypto.subtle.importKey(

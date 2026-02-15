@@ -24,6 +24,8 @@ export default function SettingsModal() {
   const [windowTransparency, setWindowTransparency] = useState(true);
   const [transparencyLevel, setTransparencyLevel] = useState(0.75); // UI Glass
   const [windowOpacity, setWindowOpacity] = useState(0.70); // Main Background
+  const [publicKeyJwk, setPublicKeyJwk] = useState(null);
+  const [privateKeyJwk, setPrivateKeyJwk] = useState(null);
 
   useEffect(() => {
     // Sync state from localStorage when settings are opened
@@ -46,6 +48,30 @@ export default function SettingsModal() {
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
       setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
+
+      // Load crypto keys for testing
+      try {
+        if (currentUsername) {
+          const pubKeyStr = localStorage.getItem(`keys_${currentUsername}_pub`);
+          const privKeyStr = localStorage.getItem(`keys_${currentUsername}_priv`);
+          if (pubKeyStr) {
+            setPublicKeyJwk(JSON.parse(pubKeyStr));
+          } else {
+             // Fallback to legacy
+             const legacyPub = localStorage.getItem('pubKey');
+             if (legacyPub) setPublicKeyJwk(JSON.parse(legacyPub));
+          }
+          if (privKeyStr) {
+            setPrivateKeyJwk(JSON.parse(privKeyStr));
+          } else {
+             // Fallback to legacy
+             const legacyPriv = localStorage.getItem('privKey');
+             if (legacyPriv) setPrivateKeyJwk(JSON.parse(legacyPriv));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load keys:', err);
+      }
 
       // Clear upload states when opening settings
       setUploadingPicture(false);
@@ -490,6 +516,22 @@ export default function SettingsModal() {
                   <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} className="sr-only peer" />
                   <div className="w-9 h-5 bg-white/20 dark:bg-white/10 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-teal-400 peer-checked:to-cyan-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 after:shadow-lg" />
                 </label>
+              </div>
+            </div>
+
+            {/* Public Key Display */}
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+              <label className={labelClass}>Public Key (Test)</label>
+              <div className="max-h-24 overflow-y-auto bg-black/20 rounded-lg p-2 text-[8px] font-mono text-cyan-300 break-all">
+                {publicKeyJwk ? JSON.stringify(publicKeyJwk, null, 2) : 'No public key found'}
+              </div>
+            </div>
+
+            {/* Private Key Display */}
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+              <label className={labelClass}>Private Key (Test)</label>
+              <div className="max-h-24 overflow-y-auto bg-black/20 rounded-lg p-2 text-[8px] font-mono text-purple-300 break-all">
+                {privateKeyJwk ? JSON.stringify(privateKeyJwk, null, 2) : 'No private key found'}
               </div>
             </div>
 

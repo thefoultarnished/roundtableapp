@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**⚠️ IMPORTANT: Unless explicitly stated otherwise, all changes, features, and modifications discussed are for ONLINE MODE only, not LAN mode.**
+
 ## Project Overview
 
 **Roundtable** is a peer-to-peer LAN messenger application built with:

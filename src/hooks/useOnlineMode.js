@@ -90,18 +90,32 @@ export function useOnlineMode(dispatch, getState) {
             if (!storedPassword || !username) {
                 // No login yet - can't initialize keys, but still need to connect to relay
                 console.log("⏸️  No credentials available, skipping key initialization");
+                console.log(`Debug: Username=${username}, Password=${storedPassword ? '***' : 'null'}`);
                 setIsInitialized(true);
                 checkConnection(false); // Connect to relay even without keys
                 return;
             }
 
             try {
+                console.log(`🔑 Starting key derivation for user: ${username}`);
                 // Derive deterministic keys from username + password
                 keys = await deriveKeyPairFromPassword(username, storedPassword);
                 console.log("✅ Derived deterministic keys from password");
+
+                // Store keys namespaced by username
+                const pubJwk = await exportKey(keys.publicKey);
+                const privJwk = await exportKey(keys.privateKey);
+                localStorage.setItem(`keys_${username}_pub`, JSON.stringify(pubJwk));
+                localStorage.setItem(`keys_${username}_priv`, JSON.stringify(privJwk));
+
+                // Also update legacy global keys for now (backward compat) but they are dangerous
+                // localStorage.setItem('pubKey', JSON.stringify(pubJwk)); 
+                // localStorage.setItem('privKey', JSON.stringify(privJwk));
+
             } catch (e) {
-                console.error("❌ Failed to derive keys from password:", e);
-                alert("Failed to generate encryption keys. Please try logging in again.");
+                console.error("❌ CRITICAL: Failed to derive keys from password:", e);
+                console.error(e.stack); // Print full stack trace
+                alert("Failed to generate encryption keys: " + e.message);
                 setIsInitialized(true);
                 return;
             }
@@ -277,6 +291,14 @@ export function useOnlineMode(dispatch, getState) {
                 currentKeyPair = await deriveKeyPairFromPassword(myUsername, storedPassword);
                 setKeyPair(currentKeyPair);
                 console.log("✅ Derived keys on-demand for identify");
+
+                 // CRITICAL FIX: Persist these keys so they are available on reload/settings
+                 const pubJwk = await exportKey(currentKeyPair.publicKey);
+                 const privJwk = await exportKey(currentKeyPair.privateKey);
+                 localStorage.setItem(`keys_${myUsername}_pub`, JSON.stringify(pubJwk));
+                 localStorage.setItem(`keys_${myUsername}_priv`, JSON.stringify(privJwk));
+                 console.log(`💾 Saved on-demand keys for ${myUsername} to localStorage`);
+
             } catch (e) {
                 console.error('❌ Failed to derive keys on-demand:', e);
                 return;
@@ -1114,6 +1136,13 @@ export function useOnlineMode(dispatch, getState) {
     }, []);
 
     const sendLogout = useCallback(() => {
+        // Clear cryptographic keys on logout to prevent next user inheriting them
+        setKeyPair(null);
+        sharedKeys.current = {};
+        // userPublicKeys.current = {}; // Optional: keep public keys to avoid re-fetching? No, safer to clear.
+        authPasswordRef.current = null;
+        setIsInitialized(false);
+
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
             console.warn('⚠️ Not connected to server, but proceeding with logout');
             return;
