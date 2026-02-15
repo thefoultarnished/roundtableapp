@@ -10,7 +10,6 @@ import NotificationContainer from './components/NotificationContainer';
 import { useTauriIntegration } from './hooks/useTauriIntegration';
 import { useTheme } from './hooks/useTheme';
 import { useTaskbarBadge } from './hooks/useTaskbarBadge';
-import './utils/taskbarBadgeTest'; // Load test function
 
 function AuroraBackground() {
   return (

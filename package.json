@@ -14,11 +14,12 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "jimp": "^1.6.0",
+    "png-to-ico": "^3.0.1",
     "vite": "^7.0.4"
   },
   "dependencies": {
     "@noble/curves": "^2.0.1",
-    "@noble/secp256k1": "^3.0.0",
     "@tauri-apps/api": "^2.6.0",
     "@tauri-apps/plugin-notification": "^2.3.0",
     "emoji-picker-react": "^4.18.0",
