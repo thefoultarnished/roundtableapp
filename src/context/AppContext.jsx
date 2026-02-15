@@ -5,12 +5,12 @@ import { setCachedProfilePic, clearAllProfilePicCaches } from '../utils/profileP
 import {
   loadAllMessages,
   loadAllFriends,
-  saveMessage,
   saveFriend,
   loadConversationMetadata,
   updateConversationMetadata,
   clearAllData
 } from '../utils/indexedDB';
+import { deriveKeyPairFromPassword, exportKey, importPublicKey, deriveSharedKey, decryptMessage } from '../utils/crypto';
 
 const AppContext = createContext(null);
 
@@ -451,12 +451,90 @@ export function AppProvider({ children }) {
       try {
         console.log('📂 Loading cached data from IndexedDB...');
 
-        // Load messages
+        // Get credentials for decryption
+        const username = localStorage.getItem('username');
+        const password = localStorage.getItem('authPassword');
+
+        // Load messages (encrypted)
         const cachedMessages = await loadAllMessages();
-        if (Object.keys(cachedMessages).length > 0) {
-          console.log(`📨 Loaded ${Object.keys(cachedMessages).length} conversations from cache`);
+        if (Object.keys(cachedMessages).length > 0 && username && password) {
+          const totalMessages = Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.length, 0);
+          console.log(`📨 Loaded ${Object.keys(cachedMessages).length} conversations (${totalMessages} messages) from IndexedDB`);
+          console.log(`🔐 Starting decryption with username: ${username}`);
+
+          // Derive keys for decryption
+          const keyPair = await deriveKeyPairFromPassword(username, password);
+          console.log(`✅ Derived key pair for decryption`);
+
+          // Load peer public keys
+          const peerKeysCache = localStorage.getItem('peerPublicKeys');
+          const peerKeys = peerKeysCache ? JSON.parse(peerKeysCache) : {};
+
+          // Decrypt all messages
+          const decryptedMessages = {};
+          let encryptedCount = 0;
+          let decryptedCount = 0;
+          let failedCount = 0;
+
+          for (const [friendId, messages] of Object.entries(cachedMessages)) {
+            console.log(`🔓 Decrypting ${messages.length} messages for friend: ${friendId}`);
+            decryptedMessages[friendId] = await Promise.all(
+              messages.map(async (msg) => {
+                try {
+                  let text = '';
+
+                  // Check if message is encrypted
+                  if (msg.content?.encrypted && msg.content.iv && msg.content.cipher) {
+                    encryptedCount++;
+                    // Decrypt message
+                    const senderId = msg.senderId === 'me' ? friendId : msg.senderId;
+                    const peerKeyJwk = peerKeys[senderId];
+
+                    if (peerKeyJwk) {
+                      const peerPublicKey = await importPublicKey(peerKeyJwk);
+                      const sharedKey = await deriveSharedKey(keyPair.privateKey, peerPublicKey);
+                      text = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
+                      decryptedCount++;
+                    } else {
+                      text = '🔒 Encrypted (Key not available)';
+                      console.warn(`❌ Missing public key for ${senderId}`);
+                      failedCount++;
+                    }
+                  } else {
+                    // Plaintext message
+                    text = msg.content?.text || '';
+                  }
+
+                  return {
+                    sender: msg.sender || msg.senderId,
+                    text: text,
+                    time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: msg.timestamp,
+                    messageId: msg.messageId,
+                    files: [],
+                    delivered: msg.delivered || false,
+                    read: msg.read || false
+                  };
+                } catch (err) {
+                  console.error('❌ Failed to decrypt message:', err);
+                  failedCount++;
+                  return {
+                    sender: msg.sender || msg.senderId,
+                    text: '⚠️ Failed to decrypt',
+                    time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: msg.timestamp,
+                    messageId: msg.messageId,
+                    files: []
+                  };
+                }
+              })
+            );
+          }
+
+          console.log(`✅ Decryption complete: ${decryptedCount}/${encryptedCount} succeeded, ${failedCount} failed`);
+
           // Merge with existing placeholder messages
-          const mergedMessages = { ...initialState.messages, ...cachedMessages };
+          const mergedMessages = { ...initialState.messages, ...decryptedMessages };
           dispatch({
             type: 'SET_MESSAGES',
             payload: mergedMessages
@@ -491,31 +569,8 @@ export function AppProvider({ children }) {
     loadCachedData();
   }, []); // Only run once on mount
 
-  // Save messages to IndexedDB when they change
-  useEffect(() => {
-    const saveMessagesToCache = async () => {
-      try {
-        // Save each conversation's messages
-        for (const [friendId, messages] of Object.entries(state.messages)) {
-          if (messages.length > 0 && friendId !== 'placeholder-aemeath' && friendId !== 'placeholder-qiuyuan') {
-            // Save each message individually (IndexedDB will handle duplicates with keyPath)
-            for (const msg of messages) {
-              await saveMessage({
-                ...msg,
-                friendId: friendId
-              }).catch(() => {}); // Ignore duplicate key errors
-            }
-          }
-        }
-      } catch (err) {
-        console.error('❌ Failed to save messages to cache:', err);
-      }
-    };
-
-    // Debounce saves to avoid performance issues
-    const timer = setTimeout(saveMessagesToCache, 500);
-    return () => clearTimeout(timer);
-  }, [state.messages]);
+  // Messages are now saved encrypted in useOnlineMode when they arrive/are sent
+  // No need to save from AppContext anymore
 
   // Save friends to IndexedDB when they change
   useEffect(() => {

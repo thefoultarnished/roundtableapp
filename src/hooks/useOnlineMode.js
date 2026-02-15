@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { isWindowFocused } from '../utils';
 import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage, deriveKeyPairFromPassword } from '../utils/crypto';
 import { setCachedProfilePic } from '../utils/profilePictureCache';
+import { saveMessage as saveEncryptedMessage } from '../utils/indexedDB';
 
 export function useOnlineMode(dispatch, getState) {
     const [ws, setWs] = useState(null);
@@ -561,6 +562,11 @@ export function useOnlineMode(dispatch, getState) {
                                 if (sharedKey) {
                                     try {
                                         // DEBUG: Print keys being used for decryption
+                                        if (senderKey) {
+                                            exportKey(senderKey).then(jwk => {
+                                                console.log("🔑 Sender's Public Key:", JSON.stringify(jwk));
+                                            });
+                                        }
                                         if (keyPair && keyPair.privateKey) {
                                             exportKey(keyPair.privateKey).then(jwk => {
                                                 console.log("🔑 Decryption Attempt - Private Key:", JSON.stringify(jwk));
@@ -828,6 +834,20 @@ export function useOnlineMode(dispatch, getState) {
                         });
                     }
 
+                    // Save encrypted message to IndexedDB for persistence
+                    saveEncryptedMessage({
+                        friendId: safeSenderId,
+                        senderId: safeSenderId,
+                        content: payload.encrypted && payload.iv && payload.cipher
+                            ? { encrypted: true, iv: payload.iv, cipher: payload.cipher }
+                            : { encrypted: false, text: payload.text || finalText },
+                        timestamp: Date.now(),
+                        messageId: data.messageId,
+                        sender: safeSenderId
+                    })
+                    .then(() => console.log('🗄️ IndexedDB - Saved ENCRYPTED incoming message'))
+                    .catch(err => console.error('🗄️ IndexedDB - ❌ Failed to save incoming message:', err));
+
                     dispatch({
                         type: 'ADD_MESSAGE',
                         payload: {
@@ -957,6 +977,24 @@ export function useOnlineMode(dispatch, getState) {
             const finalTargetId = isNaN(numericTargetId) ? safeTargetId : numericTargetId;
 
             const myMessageId = `${localStorage.getItem('username')}-${finalTargetId}-${Date.now()}`;
+            const msgTimestamp = Date.now();
+
+            // Save encrypted message to IndexedDB
+            saveEncryptedMessage({
+                friendId: finalTargetId,
+                senderId: 'me',
+                content: {
+                    encrypted: true,
+                    iv: payload.iv,
+                    cipher: payload.cipher
+                },
+                timestamp: msgTimestamp,
+                messageId: myMessageId,
+                sender: 'me'
+            })
+            .then(() => console.log('💾 Saved ENCRYPTED sent message to IndexedDB'))
+            .catch(err => console.error('❌ Failed to save sent message to IndexedDB:', err));
+
             dispatch({
                 type: 'ADD_MESSAGE',
                 payload: {
@@ -965,7 +1003,7 @@ export function useOnlineMode(dispatch, getState) {
                         sender: 'me',
                         text: text,
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        timestamp: Date.now(),
+                        timestamp: msgTimestamp,
                         messageId: myMessageId,
                         delivered: false,
                         read: false
