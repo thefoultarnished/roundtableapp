@@ -593,11 +593,16 @@ export function AppProvider({ children }) {
   // Save friends to IndexedDB when they change
   useEffect(() => {
     const saveFriendsToCache = async () => {
+      // Only save if user is logged in
+      if (!state.currentUser?.username) {
+        return;
+      }
+
       try {
         if (state.allUsers.length > 0) {
-          // Filter out placeholder users
+          // Filter out placeholder users - safely check if id is a string
           const realUsers = state.allUsers.filter(
-            u => !u.id?.startsWith('placeholder-')
+            u => typeof u.id === 'string' && !u.id.startsWith('placeholder-')
           );
           if (realUsers.length > 0) {
             for (const friend of realUsers) {
@@ -624,6 +629,11 @@ export function AppProvider({ children }) {
   // Save conversation metadata when unread counts change
   useEffect(() => {
     const saveMetadata = async () => {
+      // Only save if user is logged in
+      if (!state.currentUser?.username) {
+        return;
+      }
+
       try {
         for (const [friendId, count] of Object.entries(state.unreadCounts)) {
           if (friendId !== 'placeholder-aemeath') {
