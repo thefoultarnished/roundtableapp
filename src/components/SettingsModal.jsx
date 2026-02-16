@@ -49,29 +49,64 @@ export default function SettingsModal() {
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
       setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
 
-      // Load crypto keys for testing (use same source as decryption)
+      // Load crypto keys for testing (use same source and naming as useOnlineMode)
       try {
-        const keyUsername = localStorage.getItem('username'); // Same as useOnlineMode
+        console.log('🔑 CLAUDE: ===== KEY LOADING START =====');
+        const keyUsername = localStorage.getItem('username'); // MUST match useOnlineMode.js line 87 & 338
+        console.log(`🔑 CLAUDE: keyUsername variable = "${keyUsername}"`);
+        console.log(`🔑 CLAUDE: Source = localStorage.getItem('username')`);
+
         if (keyUsername) {
-          const pubKeyStr = localStorage.getItem(`keys_${keyUsername}_pub`);
-          const privKeyStr = localStorage.getItem(`keys_${keyUsername}_priv`);
+          const keyStorageKey = `keys_${keyUsername}`; // MUST match useOnlineMode.js storage pattern
+          console.log(`🔑 CLAUDE: keyStorageKey = "${keyStorageKey}"`);
+          console.log(`🔑 CLAUDE: Looking for localStorage["${keyStorageKey}_pub"] and localStorage["${keyStorageKey}_priv"]`);
+
+          const pubKeyStr = localStorage.getItem(`${keyStorageKey}_pub`);
+          const privKeyStr = localStorage.getItem(`${keyStorageKey}_priv`);
+
+          console.log(`🔑 CLAUDE: pubKeyStr found = ${!!pubKeyStr} (length: ${pubKeyStr?.length || 0} chars)`);
+          console.log(`🔑 CLAUDE: privKeyStr found = ${!!privKeyStr} (length: ${privKeyStr?.length || 0} chars)`);
+
           if (pubKeyStr) {
-            setPublicKeyJwk(JSON.parse(pubKeyStr));
+            const parsedPub = JSON.parse(pubKeyStr);
+            setPublicKeyJwk(parsedPub);
+            console.log(`✅ CLAUDE: Loaded public key from: ${keyStorageKey}_pub`);
+            console.log(`🔑 CLAUDE: Public Key JWK = ${JSON.stringify(parsedPub)}`);
           } else {
-             // Fallback to legacy
+             // Fallback to legacy (for backward compatibility)
              const legacyPub = localStorage.getItem('pubKey');
-             if (legacyPub) setPublicKeyJwk(JSON.parse(legacyPub));
+             console.log(`🔑 CLAUDE: Legacy pubKey found = ${!!legacyPub}`);
+             if (legacyPub) {
+               const parsedLegacyPub = JSON.parse(legacyPub);
+               setPublicKeyJwk(parsedLegacyPub);
+               console.warn('⚠️ CLAUDE: Loaded public key from legacy pubKey (should re-derive keys)');
+               console.log(`🔑 CLAUDE: Legacy Public Key JWK = ${JSON.stringify(parsedLegacyPub)}`);
+             }
           }
           if (privKeyStr) {
-            setPrivateKeyJwk(JSON.parse(privKeyStr));
+            const parsedPriv = JSON.parse(privKeyStr);
+            setPrivateKeyJwk(parsedPriv);
+            console.log(`✅ CLAUDE: Loaded private key from: ${keyStorageKey}_priv`);
+            console.log(`🔑 CLAUDE: Private Key JWK = ${JSON.stringify(parsedPriv)}`);
           } else {
              // Fallback to legacy
              const legacyPriv = localStorage.getItem('privKey');
-             if (legacyPriv) setPrivateKeyJwk(JSON.parse(legacyPriv));
+             console.log(`🔑 CLAUDE: Legacy privKey found = ${!!legacyPriv}`);
+             if (legacyPriv) {
+               const parsedLegacyPriv = JSON.parse(legacyPriv);
+               setPrivateKeyJwk(parsedLegacyPriv);
+               console.warn('⚠️ CLAUDE: Loaded private key from legacy privKey (should re-derive keys)');
+               console.log(`🔑 CLAUDE: Legacy Private Key JWK = ${JSON.stringify(parsedLegacyPriv)}`);
+             }
           }
+        } else {
+          console.warn('⚠️ CLAUDE: No username in localStorage - keys cannot be loaded');
+          console.log('🔑 CLAUDE: Available localStorage keys:', Object.keys(localStorage).filter(k => k.includes('key') || k.includes('username')));
         }
+        console.log('🔑 CLAUDE: ===== KEY LOADING END =====');
       } catch (err) {
-        console.error('Failed to load keys:', err);
+        console.error('❌ CLAUDE: Failed to load keys:', err);
+        console.error('🔑 CLAUDE: Error stack:', err.stack);
       }
 
       // Clear upload states when opening settings

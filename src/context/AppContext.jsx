@@ -465,18 +465,50 @@ export function AppProvider({ children }) {
         console.log('🗄️ IndexedDB - DEBUG: Number of conversations:', Object.keys(cachedMessages).length);
         console.log('🗄️ IndexedDB - DEBUG: username:', username, 'password:', password ? 'exists' : 'missing');
 
-        if (Object.keys(cachedMessages).length > 0 && username && password) {
+        // Only decrypt if user is properly logged in (not default username)
+        if (!username || username === 'RoundtableUser' || username === 'Anonymous') {
+          console.error(`❌ CLAUDE: CANNOT DECRYPT INDEXEDDB - Invalid/Default Username: "${username}"`);
+          console.error(`❌ CLAUDE: Expected a real username, got: "${username}"`);
+          console.error(`❌ CLAUDE: Action Required: User must login with proper credentials before messages can be decrypted`);
+          console.error(`❌ CLAUDE: Cached messages exist but cannot be accessed without proper user login`);
+          return;
+        }
+
+        if (Object.keys(cachedMessages).length === 0) {
+          console.log(`🔑 CLAUDE: No cached messages to decrypt`);
+          return;
+        }
+
+        if (!password) {
+          console.error(`❌ CLAUDE: CANNOT DECRYPT INDEXEDDB - Missing Password`);
+          console.error(`❌ CLAUDE: Username: "${username}"`);
+          console.error(`❌ CLAUDE: Password: ${password ? 'exists' : 'MISSING'}`);
+          console.error(`❌ CLAUDE: Cached messages exist but password is not available for decryption`);
+          return;
+        }
+
+        if (username && password) {
+          console.log(`🔑 CLAUDE: ===== INDEXEDDB DECRYPTION START =====`);
           const totalMessages = Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.length, 0);
           console.log(`🗄️ IndexedDB - Loaded ${Object.keys(cachedMessages).length} conversations (${totalMessages} messages)`);
+          console.log(`🔑 CLAUDE: username = "${username}"`);
+          console.log(`🔑 CLAUDE: Source = localStorage.getItem('username')`);
+          console.log(`🔑 CLAUDE: password exists = ${!!password}`);
           console.log(`🗄️ IndexedDB - Starting decryption with username: ${username}`);
 
           // Derive keys for decryption
           const keyPair = await deriveKeyPairFromPassword(username, password);
           console.log(`🗄️ IndexedDB - ✅ Derived key pair for decryption`);
+          console.log(`🔑 CLAUDE: keyPair.privateKey type = ${keyPair.privateKey.type}`);
+          console.log(`🔑 CLAUDE: keyPair.publicKey type = ${keyPair.publicKey.type}`);
 
           // Load peer public keys
           const peerKeysCache = localStorage.getItem('peerPublicKeys');
           const peerKeys = peerKeysCache ? JSON.parse(peerKeysCache) : {};
+          console.log(`🔑 CLAUDE: peerPublicKeys found in localStorage = ${!!peerKeysCache}`);
+          console.log(`🔑 CLAUDE: Number of peer keys available = ${Object.keys(peerKeys).length}`);
+          console.log(`🔑 CLAUDE: Peer IDs: ${Object.keys(peerKeys).join(', ')}`);
+          console.log(`🔑 CLAUDE: Full peerKeys object = ${JSON.stringify(peerKeys)}`);
 
           // Decrypt all messages
           const decryptedMessages = {};
@@ -486,27 +518,58 @@ export function AppProvider({ children }) {
 
           for (const [friendId, messages] of Object.entries(cachedMessages)) {
             console.log(`🗄️ IndexedDB - 🔓 Decrypting ${messages.length} messages for friend: ${friendId}`);
+            console.log(`🗄️ IndexedDB - Available peer keys:`, Object.keys(peerKeys));
             decryptedMessages[friendId] = await Promise.all(
-              messages.map(async (msg) => {
+              messages.map(async (msg, idx) => {
                 try {
                   let text = '';
 
                   // Check if message is encrypted
                   if (msg.content?.encrypted && msg.content.iv && msg.content.cipher) {
                     encryptedCount++;
+                    console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION START =====`);
                     // Decrypt message
                     const senderId = msg.senderId === 'me' ? friendId : msg.senderId;
+                    console.log(`🔑 CLAUDE: friendId = "${friendId}"`);
+                    console.log(`🔑 CLAUDE: msg.senderId = "${msg.senderId}"`);
+                    console.log(`🔑 CLAUDE: Calculated senderId = "${senderId}"`);
+
                     const peerKeyJwk = peerKeys[senderId];
+                    console.log(`🔑 CLAUDE: Looking for peerKeys["${senderId}"]`);
+                    console.log(`🔑 CLAUDE: peerKeyJwk found = ${!!peerKeyJwk}`);
 
                     if (peerKeyJwk) {
-                      const peerPublicKey = await importPublicKey(peerKeyJwk);
-                      const sharedKey = await deriveSharedKey(keyPair.privateKey, peerPublicKey);
-                      text = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
-                      decryptedCount++;
+                      try {
+                        console.log(`🔑 CLAUDE: peerKeyJwk content = ${JSON.stringify(peerKeyJwk)}`);
+                        console.log(`🔑 CLAUDE: msg.content.iv = ${JSON.stringify(msg.content.iv)}`);
+                        console.log(`🔑 CLAUDE: msg.content.cipher = ${JSON.stringify(msg.content.cipher).substring(0, 100)}...`);
+
+                        const peerPublicKey = await importPublicKey(peerKeyJwk);
+                        console.log(`🔑 CLAUDE: peerPublicKey imported successfully, type = ${peerPublicKey.type}`);
+
+                        const sharedKey = await deriveSharedKey(keyPair.privateKey, peerPublicKey);
+                        console.log(`🔑 CLAUDE: sharedKey derived successfully, type = ${sharedKey.type}`);
+
+                        text = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
+                        decryptedCount++;
+                        console.log(`✅ CLAUDE: Decryption SUCCESS for ${senderId}`);
+                        console.log(`🗄️ IndexedDB - ✅ Decrypted message from ${senderId}`);
+                        console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION END (SUCCESS) =====`);
+                      } catch (decryptErr) {
+                        console.error(`❌ CLAUDE: Decryption FAILED for ${senderId}:`, decryptErr.message);
+                        console.error(`🔑 CLAUDE: Error details = ${decryptErr.toString()}`);
+                        console.error(`🗄️ IndexedDB - ❌ Decryption failed for ${senderId}:`, decryptErr.message);
+                        text = '⚠️ Decryption failed (key mismatch)';
+                        failedCount++;
+                        console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION END (FAILED) =====`);
+                      }
                     } else {
                       text = '🔒 Encrypted (Key not available)';
-                      console.warn(`🗄️ IndexedDB - ❌ Missing public key for ${senderId}`);
+                      console.warn(`❌ CLAUDE: Missing public key for ${senderId}`);
+                      console.warn(`🔑 CLAUDE: Available peer IDs: ${Object.keys(peerKeys).join(', ')}`);
+                      console.warn(`🗄️ IndexedDB - ❌ Missing public key for ${senderId}. Available: ${Object.keys(peerKeys).join(', ')}`);
                       failedCount++;
+                      console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION END (NO KEY) =====`);
                     }
                   } else {
                     // Plaintext message
@@ -540,6 +603,14 @@ export function AppProvider({ children }) {
           }
 
           console.log(`🗄️ IndexedDB - ✅ Decryption complete: ${decryptedCount}/${encryptedCount} succeeded, ${failedCount} failed`);
+          console.log(`🔑 CLAUDE: ===== INDEXEDDB DECRYPTION SUMMARY =====`);
+          console.log(`🔑 CLAUDE: Total messages processed = ${encryptedCount + Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.filter(m => !m.content?.encrypted).length, 0)}`);
+          console.log(`🔑 CLAUDE: Encrypted messages = ${encryptedCount}`);
+          console.log(`🔑 CLAUDE: Successfully decrypted = ${decryptedCount}`);
+          console.log(`🔑 CLAUDE: Failed to decrypt = ${failedCount}`);
+          console.log(`🔑 CLAUDE: username used = "${username}"`);
+          console.log(`🔑 CLAUDE: Peer keys available = ${Object.keys(peerKeys).length}`);
+          console.log(`🔑 CLAUDE: ===== INDEXEDDB DECRYPTION END =====`);
 
           // Merge with existing placeholder messages
           const mergedMessages = { ...initialState.messages, ...decryptedMessages };

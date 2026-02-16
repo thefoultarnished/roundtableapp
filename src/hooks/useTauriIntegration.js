@@ -33,12 +33,12 @@ export function useTauriIntegration() {
       }
     }
 
-    // Generate user ID if needed
+    // Generate user ID if needed - ONLY on first install
     if (!localStorage.getItem('userId') || isNaN(parseInt(localStorage.getItem('userId'), 10))) {
       const newId = Math.floor(Math.random() * 100000000);
       localStorage.setItem('userId', newId);
-      localStorage.setItem('username', 'RoundtableUser');
-      localStorage.setItem('displayName', 'New User');
+      // DON'T set default username - keep null until user logs in
+      // This prevents accidental key derivation with wrong username
     }
 
     // Load saved font scale
