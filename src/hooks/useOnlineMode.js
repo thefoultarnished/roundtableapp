@@ -992,8 +992,8 @@ export function useOnlineMode(dispatch, getState) {
                 messageId: myMessageId,
                 sender: 'me'
             })
-            .then(() => console.log('💾 Saved ENCRYPTED sent message to IndexedDB'))
-            .catch(err => console.error('❌ Failed to save sent message to IndexedDB:', err));
+            .then(() => console.log('🗄️ IndexedDB - Saved ENCRYPTED sent message'))
+            .catch(err => console.error('🗄️ IndexedDB - ❌ Failed to save sent message:', err));
 
             dispatch({
                 type: 'ADD_MESSAGE',

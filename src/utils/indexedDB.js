@@ -64,8 +64,14 @@ export async function saveMessage(message) {
     const store = transaction.objectStore(STORES.MESSAGES);
     const request = store.add(message);
 
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      console.log('🗄️ IndexedDB - DEBUG: Message saved with ID:', request.result);
+      resolve();
+    };
+    request.onerror = () => {
+      console.error('🗄️ IndexedDB - DEBUG: Save failed:', request.error);
+      reject(request.error);
+    };
   });
 }
 
@@ -118,6 +124,9 @@ export async function loadAllMessages() {
 
     request.onsuccess = () => {
       const messages = request.result || [];
+      console.log('🗄️ IndexedDB - DEBUG: Raw messages from DB:', messages.length, 'messages');
+      console.log('🗄️ IndexedDB - DEBUG: First message:', messages[0]);
+
       // Group by friendId
       const grouped = messages.reduce((acc, msg) => {
         if (!acc[msg.friendId]) acc[msg.friendId] = [];
@@ -130,9 +139,13 @@ export async function loadAllMessages() {
         grouped[friendId].sort((a, b) => a.timestamp - b.timestamp);
       });
 
+      console.log('🗄️ IndexedDB - DEBUG: Grouped messages:', Object.keys(grouped).length, 'conversations');
       resolve(grouped);
     };
-    request.onerror = () => reject(request.error);
+    request.onerror = () => {
+      console.error('🗄️ IndexedDB - DEBUG: Load failed:', request.error);
+      reject(request.error);
+    };
   });
 }
 

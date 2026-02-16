@@ -206,8 +206,8 @@ function appReducer(state, action) {
       // localStorage.removeItem('privKey');
       // localStorage.removeItem('pubKey');
 
-      // Clear IndexedDB cache
-      clearAllData().catch(err => console.error('Failed to clear IndexedDB:', err));
+      // DO NOT clear IndexedDB - keep messages for next login (needed for decryption)
+      // clearAllData().catch(err => console.error('Failed to clear IndexedDB:', err));
 
       // Clear all profile picture caches
       clearAllProfilePicCaches();
@@ -445,11 +445,15 @@ export function AppProvider({ children }) {
   // Sync profile pictures on app launch
   useProfilePictureSync(dispatch, state.allUsers, online?.isOnline);
 
-  // Load cached data from IndexedDB on mount
-  useEffect(() => {
-    const loadCachedData = async () => {
+  // Separate function to load encrypted messages from IndexedDB
+  const loadEncryptedMessages = useCallback(async () => {
+    // Only load if user is logged in
+    if (!state.currentUser?.username) {
+      console.log('🗄️ IndexedDB - Skipped (user not logged in)');
+      return;
+    }
       try {
-        console.log('📂 Loading cached data from IndexedDB...');
+        console.log('🗄️ IndexedDB - Loading cached data...');
 
         // Get credentials for decryption
         const username = localStorage.getItem('username');
@@ -457,14 +461,18 @@ export function AppProvider({ children }) {
 
         // Load messages (encrypted)
         const cachedMessages = await loadAllMessages();
+        console.log('🗄️ IndexedDB - DEBUG: loadAllMessages returned:', cachedMessages);
+        console.log('🗄️ IndexedDB - DEBUG: Number of conversations:', Object.keys(cachedMessages).length);
+        console.log('🗄️ IndexedDB - DEBUG: username:', username, 'password:', password ? 'exists' : 'missing');
+
         if (Object.keys(cachedMessages).length > 0 && username && password) {
           const totalMessages = Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.length, 0);
-          console.log(`📨 Loaded ${Object.keys(cachedMessages).length} conversations (${totalMessages} messages) from IndexedDB`);
-          console.log(`🔐 Starting decryption with username: ${username}`);
+          console.log(`🗄️ IndexedDB - Loaded ${Object.keys(cachedMessages).length} conversations (${totalMessages} messages)`);
+          console.log(`🗄️ IndexedDB - Starting decryption with username: ${username}`);
 
           // Derive keys for decryption
           const keyPair = await deriveKeyPairFromPassword(username, password);
-          console.log(`✅ Derived key pair for decryption`);
+          console.log(`🗄️ IndexedDB - ✅ Derived key pair for decryption`);
 
           // Load peer public keys
           const peerKeysCache = localStorage.getItem('peerPublicKeys');
@@ -477,7 +485,7 @@ export function AppProvider({ children }) {
           let failedCount = 0;
 
           for (const [friendId, messages] of Object.entries(cachedMessages)) {
-            console.log(`🔓 Decrypting ${messages.length} messages for friend: ${friendId}`);
+            console.log(`🗄️ IndexedDB - 🔓 Decrypting ${messages.length} messages for friend: ${friendId}`);
             decryptedMessages[friendId] = await Promise.all(
               messages.map(async (msg) => {
                 try {
@@ -497,7 +505,7 @@ export function AppProvider({ children }) {
                       decryptedCount++;
                     } else {
                       text = '🔒 Encrypted (Key not available)';
-                      console.warn(`❌ Missing public key for ${senderId}`);
+                      console.warn(`🗄️ IndexedDB - ❌ Missing public key for ${senderId}`);
                       failedCount++;
                     }
                   } else {
@@ -516,7 +524,7 @@ export function AppProvider({ children }) {
                     read: msg.read || false
                   };
                 } catch (err) {
-                  console.error('❌ Failed to decrypt message:', err);
+                  console.error('🗄️ IndexedDB - ❌ Failed to decrypt message:', err);
                   failedCount++;
                   return {
                     sender: msg.sender || msg.senderId,
@@ -531,7 +539,7 @@ export function AppProvider({ children }) {
             );
           }
 
-          console.log(`✅ Decryption complete: ${decryptedCount}/${encryptedCount} succeeded, ${failedCount} failed`);
+          console.log(`🗄️ IndexedDB - ✅ Decryption complete: ${decryptedCount}/${encryptedCount} succeeded, ${failedCount} failed`);
 
           // Merge with existing placeholder messages
           const mergedMessages = { ...initialState.messages, ...decryptedMessages };
@@ -544,14 +552,14 @@ export function AppProvider({ children }) {
         // Load friends
         const cachedFriends = await loadAllFriends();
         if (cachedFriends.length > 0) {
-          console.log(`👥 Loaded ${cachedFriends.length} friends from cache`);
+          console.log(`🗄️ IndexedDB - Loaded ${cachedFriends.length} friends`);
           dispatch({ type: 'SET_ALL_USERS', payload: cachedFriends });
         }
 
         // Load conversation metadata (unread counts, last message times)
         const metadata = await loadConversationMetadata();
         if (Object.keys(metadata).length > 0) {
-          console.log(`💬 Loaded metadata for ${Object.keys(metadata).length} conversations`);
+          console.log(`🗄️ IndexedDB - Loaded metadata for ${Object.keys(metadata).length} conversations`);
           // Update unread counts
           const unreadCounts = {};
           Object.keys(metadata).forEach(friendId => {
@@ -560,14 +568,24 @@ export function AppProvider({ children }) {
           dispatch({ type: 'SET_UNREAD_COUNTS', payload: unreadCounts });
         }
 
-        console.log('✅ Cache loading complete');
+        console.log('🗄️ IndexedDB - ✅ Cache loading complete');
       } catch (err) {
-        console.error('❌ Failed to load cached data:', err);
+        console.error('🗄️ IndexedDB - ❌ Failed to load cached data:', err);
       }
-    };
+  }, [state.currentUser?.username, dispatch]);
 
-    loadCachedData();
+  // Load on mount if user already logged in
+  useEffect(() => {
+    loadEncryptedMessages();
   }, []); // Only run once on mount
+
+  // Load when user logs in (currentUser changes from null to user)
+  useEffect(() => {
+    if (state.currentUser?.username) {
+      console.log('🗄️ IndexedDB - Triggering load after login');
+      loadEncryptedMessages();
+    }
+  }, [state.currentUser?.username, loadEncryptedMessages]); // Watch for login
 
   // Messages are now saved encrypted in useOnlineMode when they arrive/are sent
   // No need to save from AppContext anymore
@@ -594,7 +612,7 @@ export function AppProvider({ children }) {
           }
         }
       } catch (err) {
-        console.error('❌ Failed to save friends to cache:', err);
+        console.error('🗄️ IndexedDB - ❌ Failed to save friends:', err);
       }
     };
 
@@ -616,7 +634,7 @@ export function AppProvider({ children }) {
           }
         }
       } catch (err) {
-        console.error('❌ Failed to save conversation metadata:', err);
+        console.error('🗄️ IndexedDB - ❌ Failed to save conversation metadata:', err);
       }
     };
 
