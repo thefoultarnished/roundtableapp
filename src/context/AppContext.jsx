@@ -414,13 +414,14 @@ function appReducer(state, action) {
     }
 
     case 'UPDATE_USER_PROFILE_PICTURE': {
-      const { userId, profilePicture } = action.payload;
+      const { userId, profilePicture, timestamp } = action.payload;
       const updatedUsers = state.allUsers.map(u => {
         if (u.id === userId || u.username === userId) {
-          // Cache the new profile picture URL
-          const username = u.username || userId;
-          setCachedProfilePic(username, profilePicture, Date.now());
-          return { ...u, profile_picture: profilePicture };
+          return {
+            ...u,
+            profile_picture: profilePicture,
+            profile_picture_timestamp: timestamp || Date.now()
+          };
         }
         return u;
       });

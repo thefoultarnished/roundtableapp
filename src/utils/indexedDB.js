@@ -4,13 +4,14 @@
  */
 
 const DB_NAME = 'RoundtableDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Object stores (tables)
 const STORES = {
   MESSAGES: 'messages',
   FRIENDS: 'friends',
-  CONVERSATIONS: 'conversations'
+  CONVERSATIONS: 'conversations',
+  PROFILE_PICTURES: 'profilePictures'
 };
 
 /**
@@ -47,6 +48,13 @@ export async function initDB() {
       if (!db.objectStoreNames.contains(STORES.CONVERSATIONS)) {
         const conversationsStore = db.createObjectStore(STORES.CONVERSATIONS, { keyPath: 'friendId' });
         conversationsStore.createIndex('lastMessageTime', 'lastMessageTime', { unique: false });
+      }
+
+      // Profile Pictures store: { userId, blob, timestamp, url, cachedAt, size }
+      if (!db.objectStoreNames.contains(STORES.PROFILE_PICTURES)) {
+        const profilePicturesStore = db.createObjectStore(STORES.PROFILE_PICTURES, { keyPath: 'userId' });
+        profilePicturesStore.createIndex('timestamp', 'timestamp', { unique: false });
+        profilePicturesStore.createIndex('cachedAt', 'cachedAt', { unique: false });
       }
     };
   });
@@ -252,13 +260,14 @@ export async function clearAllData() {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(
-      [STORES.MESSAGES, STORES.FRIENDS, STORES.CONVERSATIONS],
+      [STORES.MESSAGES, STORES.FRIENDS, STORES.CONVERSATIONS, STORES.PROFILE_PICTURES],
       'readwrite'
     );
 
     transaction.objectStore(STORES.MESSAGES).clear();
     transaction.objectStore(STORES.FRIENDS).clear();
     transaction.objectStore(STORES.CONVERSATIONS).clear();
+    transaction.objectStore(STORES.PROFILE_PICTURES).clear();
 
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
@@ -288,5 +297,154 @@ export async function deleteMessagesByFriend(friendId) {
       }
     };
     request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Save profile picture blob to IndexedDB
+ * @param {Object} profilePicture - { userId, blob, timestamp, url, cachedAt, size }
+ * @returns {Promise<void>}
+ */
+export async function saveProfilePictureBlob(profilePicture) {
+  const db = await initDB();
+
+  // Check if store exists (handle version mismatch)
+  if (!db.objectStoreNames.contains(STORES.PROFILE_PICTURES)) {
+    console.warn(`⚠️ Store ${STORES.PROFILE_PICTURES} not found. Force closing DB to trigger upgrade.`);
+    db.close();
+    // Close and reopen to trigger upgrade
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      request.onsuccess = () => {
+        console.log('🗄️ Database deleted, will be recreated on next access');
+        resolve();
+      };
+      request.onerror = () => {
+        console.error('Failed to delete database:', request.error);
+        reject(request.error);
+      };
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.PROFILE_PICTURES], 'readwrite');
+    const store = transaction.objectStore(STORES.PROFILE_PICTURES);
+    const request = store.put(profilePicture);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Get profile picture blob from IndexedDB
+ * @param {string} userId - User's ID
+ * @returns {Promise<Object|null>} - Profile picture object or null
+ */
+export async function getProfilePictureBlob(userId) {
+  const db = await initDB();
+
+  // Check if store exists (handle version mismatch)
+  if (!db.objectStoreNames.contains(STORES.PROFILE_PICTURES)) {
+    console.warn(`⚠️ Store ${STORES.PROFILE_PICTURES} not found. Database needs upgrade.`);
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.PROFILE_PICTURES], 'readonly');
+    const store = transaction.objectStore(STORES.PROFILE_PICTURES);
+    const request = store.get(userId);
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Delete profile picture blob for a specific user
+ * @param {string} userId - User's ID
+ * @returns {Promise<void>}
+ */
+export async function deleteProfilePictureBlob(userId) {
+  const db = await initDB();
+
+  // Check if store exists
+  if (!db.objectStoreNames.contains(STORES.PROFILE_PICTURES)) {
+    console.log('⚠️ Profile pictures store not found, skipping delete');
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.PROFILE_PICTURES], 'readwrite');
+    const store = transaction.objectStore(STORES.PROFILE_PICTURES);
+    const request = store.delete(userId);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Get all profile picture blobs
+ * @returns {Promise<Array>}
+ */
+export async function getAllProfilePictureBlobs() {
+  const db = await initDB();
+
+  // Check if store exists
+  if (!db.objectStoreNames.contains(STORES.PROFILE_PICTURES)) {
+    console.log('⚠️ Profile pictures store not found');
+    return [];
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.PROFILE_PICTURES], 'readonly');
+    const store = transaction.objectStore(STORES.PROFILE_PICTURES);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Clear all profile picture blobs
+ * @returns {Promise<void>}
+ */
+export async function clearAllProfilePictureBlobs() {
+  const db = await initDB();
+
+  // Check if store exists
+  if (!db.objectStoreNames.contains(STORES.PROFILE_PICTURES)) {
+    console.log('⚠️ Profile pictures store not found, skipping clear');
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.PROFILE_PICTURES], 'readwrite');
+    const store = transaction.objectStore(STORES.PROFILE_PICTURES);
+    const request = store.clear();
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Force database upgrade by deleting and recreating
+ * Call this if you get "store not found" errors
+ * @returns {Promise<void>}
+ */
+export async function forceUpgradeDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => {
+      console.log('🗄️ Database deleted and will be recreated with new schema on next access');
+      resolve();
+    };
+    request.onerror = () => {
+      console.error('Failed to delete database:', request.error);
+      reject(request.error);
+    };
   });
 }

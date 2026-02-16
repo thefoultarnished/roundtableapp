@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { useProfilePictureBlobUrl } from '../hooks/useProfilePictureBlobUrl';
 
 export default function Sidebar() {
   const { state, dispatch, online } = useAppContext();
@@ -80,7 +81,11 @@ export default function Sidebar() {
 
   // Get profile picture from Redux state (server source of truth)
   const currentUserData = state.allUsers.find(u => u.username === currentUsername);
-  const profilePicture = currentUserData?.profile_picture || null;
+  const { blobUrl: profilePicture } = useProfilePictureBlobUrl(
+    currentUsername,
+    currentUserData?.profile_picture,
+    currentUserData?.profile_picture_timestamp
+  );
 
   return (
     <>
@@ -427,44 +432,15 @@ export default function Sidebar() {
                 <p className="text-sm text-slate-400">No pending requests</p>
               </div>
             ) : (
-              pendingRequests.map((request) => {
-                const senderId = request.sender_id;
-                // Use enriched data from server if available, otherwise fallback to allUsers lookup
-                const senderUsername = request.sender_username || senderId;
-                const senderDisplayName = request.sender_display_name || request.sender_username || senderId;
-                const user = state.allUsers.find(u => u.id === senderId || u.username === senderUsername);
-                return (
-                  <div key={senderId} className="flex items-center gap-3 p-3 rounded-lg bg-white/10 border border-white/10 hover:bg-white/15 transition-all">
-                    <div className="flex-shrink-0">
-                      {user?.profile_picture ? (
-                        <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover" alt={senderDisplayName} />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm">
-                          {senderDisplayName?.charAt(0).toUpperCase() || '?'}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-grow min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{senderDisplayName}</p>
-                      <p className="text-xs text-slate-500">@{senderUsername}</p>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => handleAcceptFriendRequest(senderId)}
-                        className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => handleDeclineFriendRequest(senderId)}
-                        className="px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-slate-300 text-xs font-semibold hover:bg-white/20 transition-all active:scale-95"
-                      >
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
+              pendingRequests.map((request) => (
+                <PendingRequestItem
+                  key={request.sender_id}
+                  request={request}
+                  onAccept={handleAcceptFriendRequest}
+                  onDecline={handleDeclineFriendRequest}
+                  allUsers={state.allUsers}
+                />
+              ))
             )}
           </div>
         </div>
@@ -474,9 +450,60 @@ export default function Sidebar() {
   );
 }
 
+function PendingRequestItem({ request, onAccept, onDecline, allUsers }) {
+  const senderId = request.sender_id;
+  const senderUsername = request.sender_username || senderId;
+  const senderDisplayName = request.sender_display_name || request.sender_username || senderId;
+  const user = allUsers.find(u => u.id === senderId || u.username === senderUsername);
+
+  const { blobUrl } = useProfilePictureBlobUrl(
+    senderId,
+    user?.profile_picture,
+    user?.profile_picture_timestamp
+  );
+
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/10 border border-white/10 hover:bg-white/15 transition-all">
+      <div className="flex-shrink-0">
+        {blobUrl ? (
+          <img src={blobUrl} className="w-10 h-10 rounded-full object-cover" alt={senderDisplayName} />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm">
+            {senderDisplayName?.charAt(0).toUpperCase() || '?'}
+          </div>
+        )}
+      </div>
+      <div className="flex-grow min-w-0">
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{senderDisplayName}</p>
+        <p className="text-xs text-slate-500">@{senderUsername}</p>
+      </div>
+      <div className="flex gap-2 flex-shrink-0">
+        <button
+          onClick={() => onAccept(senderId)}
+          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs font-semibold hover:shadow-lg hover:shadow-emerald-500/30 transition-all active:scale-95"
+        >
+          Accept
+        </button>
+        <button
+          onClick={() => onDecline(senderId)}
+          className="px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-slate-300 text-xs font-semibold hover:bg-white/20 transition-all active:scale-95"
+        >
+          Decline
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername, isPending }) {
-  const avatarHtml = user.profile_picture
-    ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
+  const { blobUrl } = useProfilePictureBlobUrl(
+    user.id || user.username,
+    user.profile_picture,
+    user.profile_picture_timestamp
+  );
+
+  const avatarHtml = blobUrl
+    ? <img src={blobUrl} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shadow-lg ring-2 ring-white/20">
         {user.name?.charAt(0).toUpperCase() || '?'}
@@ -517,8 +544,14 @@ function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername, isPe
 }
 
 function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPending, onAddFriend }) {
-  const avatarHtml = user.profile_picture
-    ? <img src={user.profile_picture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
+  const { blobUrl } = useProfilePictureBlobUrl(
+    user.id || user.username,
+    user.profile_picture,
+    user.profile_picture_timestamp
+  );
+
+  const avatarHtml = blobUrl
+    ? <img src={blobUrl} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20" alt={user.name} />
     : (
       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white text-sm shadow-lg ring-2 ring-white/20">
         {user.name?.charAt(0).toUpperCase() || '?'}

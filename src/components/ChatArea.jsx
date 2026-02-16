@@ -4,6 +4,7 @@ import MessageBubble from './MessageBubble';
 import { useNetwork } from '../hooks/useNetwork';
 import EmojiPicker from 'emoji-picker-react';
 import * as utils from '../utils';
+import { useProfilePictureBlobUrl } from '../hooks/useProfilePictureBlobUrl';
 
 export default function ChatArea() {
   const { state, dispatch, online } = useAppContext();
@@ -71,6 +72,11 @@ export default function ChatArea() {
   }, []);
 
   const activeUser = state.allUsers.find(u => u.id === state.activeChatUserId);
+  const { blobUrl: activeUserProfilePicture } = useProfilePictureBlobUrl(
+    activeUser?.id || activeUser?.username,
+    activeUser?.profile_picture,
+    activeUser?.profile_picture_timestamp
+  );
   const userMessages = state.activeChatUserId ? (state.messages[state.activeChatUserId] || []) : [];
   const groupedMessages = useMemo(() => utils.groupMessagesByDate(userMessages), [userMessages]);
 
@@ -633,9 +639,9 @@ export default function ChatArea() {
           <div className="flex items-center space-x-4 min-w-0">
             {/* Avatar */}
             <div className="relative flex-shrink-0 group">
-              {activeUser?.profile_picture ? (
+              {activeUserProfilePicture ? (
                 <div className="w-12 h-12 rounded-full shadow-lg ring-2 ring-cyan-400/20 overflow-hidden hover:ring-cyan-400/40 transition-all duration-300">
-                  <img src={activeUser.profile_picture} className="w-full h-full object-cover" alt={activeUser.name} />
+                  <img src={activeUserProfilePicture} className="w-full h-full object-cover" alt={activeUser.name} />
                 </div>
               ) : (
                 <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-lg flex-shrink-0 bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg ring-2 ring-cyan-400/20 group-hover:ring-cyan-400/40 transition-all duration-300">

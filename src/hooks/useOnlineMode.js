@@ -6,6 +6,8 @@ import { isWindowFocused } from '../utils';
 import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage, deriveKeyPairFromPassword } from '../utils/crypto';
 import { setCachedProfilePic } from '../utils/profilePictureCache';
 import { saveMessage as saveEncryptedMessage } from '../utils/indexedDB';
+import { cacheProfilePictureBlob, clearAllProfilePictureBlobsWithRevoke } from '../utils/profilePictureBlobCache';
+import { blobUrlManager } from '../utils/blobUrlManager';
 
 export function useOnlineMode(dispatch, getState) {
     const [ws, setWs] = useState(null);
@@ -925,14 +927,19 @@ export function useOnlineMode(dispatch, getState) {
 
                 // Only update if profilePicture URL is actually provided
                 if (profilePicture) {
-                    // Cache the new profile picture with timestamp from server
+                    // Background fetch and cache blob
+                    cacheProfilePictureBlob(userId, profilePicture, timestamp || Date.now())
+                        .catch(err => console.error(`📸 Blob cache failed for ${userId}:`, err));
+
+                    // Keep localStorage during migration (temporary)
                     setCachedProfilePic(userId, profilePicture, timestamp || Date.now());
 
                     dispatch({
                         type: 'UPDATE_USER_PROFILE_PICTURE',
                         payload: {
                             userId: userId,
-                            profilePicture: profilePicture
+                            profilePicture: profilePicture,
+                            timestamp: timestamp || Date.now()
                         }
                     });
                     console.log(`✅ Updated profile picture for user ${userId} and cached`);
@@ -1220,13 +1227,21 @@ export function useOnlineMode(dispatch, getState) {
         console.log(`📸 Sent profile picture update to server`);
     }, []);
 
-    const sendLogout = useCallback(() => {
+    const sendLogout = useCallback(async () => {
         // Clear cryptographic keys on logout to prevent next user inheriting them
         setKeyPair(null);
         sharedKeys.current = {};
         // userPublicKeys.current = {}; // Optional: keep public keys to avoid re-fetching? No, safer to clear.
         authPasswordRef.current = null;
         setIsInitialized(false);
+
+        // Cleanup blob URLs and IndexedDB cache
+        try {
+            await clearAllProfilePictureBlobsWithRevoke();
+            console.log('📸 Cleaned up profile picture cache on logout');
+        } catch (error) {
+            console.error('📸 Failed to cleanup profile picture cache:', error);
+        }
 
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
             console.warn('⚠️ Not connected to server, but proceeding with logout');

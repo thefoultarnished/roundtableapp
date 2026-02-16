@@ -1,13 +1,39 @@
 import { useEffect, useRef } from 'react';
-import { getCachedProfilePic, isCacheStale, setCachedProfilePic } from '../utils/profilePictureCache';
+import {
+  migrateFromLocalStorage,
+  cleanupOldProfilePictures,
+  isCacheValid,
+  cacheProfilePictureBlob
+} from '../utils/profilePictureBlobCache';
+import { getCachedProfilePic, setCachedProfilePic } from '../utils/profilePictureCache';
 
 /**
  * Hook to sync profile pictures on app launch
- * Checks localStorage cache and fetches from server if stale
+ * Migrates from localStorage to IndexedDB and manages lazy loading
  */
 export function useProfilePictureSync(dispatch, allUsers, isOnline) {
+  const migrationDone = useRef(false);
   const syncedUsers = useRef(new Set());
 
+  // One-time migration from localStorage to IndexedDB
+  useEffect(() => {
+    if (migrationDone.current) return;
+
+    async function runMigration() {
+      try {
+        console.log('📸 Running one-time migration from localStorage to IndexedDB...');
+        await migrateFromLocalStorage();
+        await cleanupOldProfilePictures();
+        migrationDone.current = true;
+      } catch (error) {
+        console.error('📸 Migration failed:', error);
+      }
+    }
+
+    runMigration();
+  }, []);
+
+  // Lazy loading: check cache validity and update if needed
   useEffect(() => {
     if (!isOnline || !allUsers || allUsers.length === 0) return;
 
@@ -17,36 +43,47 @@ export function useProfilePictureSync(dispatch, allUsers, isOnline) {
       // Skip if already synced in this session
       if (syncedUsers.current.has(username)) return;
 
-      // Check cache
-      const cached = getCachedProfilePic(username);
+      const profilePictureUrl = user.profile_picture;
+      const serverTimestamp = user.profile_picture_timestamp || Date.now();
 
-      if (!cached || isCacheStale(cached.timestamp)) {
-        // Cache is empty or stale
-        console.log(`📸 Cache stale/empty for ${username}, using server data`);
+      if (!profilePictureUrl) {
+        syncedUsers.current.add(username);
+        return;
+      }
 
-        if (user.profile_picture) {
-          // Update cache with fresh data from server
-          setCachedProfilePic(username, user.profile_picture, Date.now());
+      // Check IndexedDB cache validity
+      (async () => {
+        try {
+          const cacheIsValid = await isCacheValid(username, serverTimestamp);
+
+          if (!cacheIsValid) {
+            // Cache is stale or missing - fetch and cache blob
+            console.log(`📸 Cache miss/stale for ${username}, fetching from server...`);
+
+            // Keep localStorage during migration (temporary)
+            setCachedProfilePic(username, profilePictureUrl, serverTimestamp);
+
+            // Fetch and cache blob in background
+            await cacheProfilePictureBlob(username, profilePictureUrl, serverTimestamp);
+
+            console.log(`📸 Updated cache for ${username}`);
+          } else {
+            console.log(`📸 Using cached blob for ${username}`);
+          }
+
+          syncedUsers.current.add(username);
+        } catch (error) {
+          console.error(`📸 Sync failed for ${username}:`, error);
+
+          // Fallback to localStorage during migration
+          const cached = getCachedProfilePic(username);
+          if (!cached || cached.url !== profilePictureUrl) {
+            setCachedProfilePic(username, profilePictureUrl, serverTimestamp);
+          }
+
           syncedUsers.current.add(username);
         }
-      } else {
-        // Cache is valid
-        console.log(`📸 Using cached profile pic for ${username}`);
-
-        // If server data differs from cache, update UI with cached version
-        // (This handles the case where localStorage has newer data than initial server sync)
-        if (user.profile_picture !== cached.url) {
-          dispatch({
-            type: 'UPDATE_USER_PROFILE_PICTURE',
-            payload: {
-              userId: username,
-              profilePicture: cached.url
-            }
-          });
-        }
-
-        syncedUsers.current.add(username);
-      }
+      })();
     });
   }, [allUsers, isOnline, dispatch]);
 

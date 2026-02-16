@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import * as utils from '../utils';
+import { useProfilePictureBlobUrl } from '../hooks/useProfilePictureBlobUrl';
 
 function MessageBubble({ message }) {
   const { state } = useAppContext();
@@ -47,7 +48,20 @@ function MessageBubble({ message }) {
   );
   // Get current user's profile picture from Redux state (same as settings area)
   const currentUserData = isSentByMe ? state.allUsers.find(u => u.username === state.currentUser?.username) : null;
-  const myProfilePicture = currentUserData?.profile_picture || null;
+
+  // Use blob URL for current user's profile picture
+  const { blobUrl: myProfilePicture } = useProfilePictureBlobUrl(
+    currentUserData?.username,
+    currentUserData?.profile_picture,
+    currentUserData?.profile_picture_timestamp
+  );
+
+  // Use blob URL for sender's profile picture
+  const { blobUrl: senderProfilePicture } = useProfilePictureBlobUrl(
+    senderUser?.id || senderUser?.username,
+    senderUser?.profile_picture,
+    senderUser?.profile_picture_timestamp
+  );
 
   if (isSentByMe && !myProfilePicture) {
     console.warn('⚠️ MyProfilePicture is null/empty', {
@@ -71,8 +85,8 @@ function MessageBubble({ message }) {
   }
 
   const senderAvatar = !isSentByMe ? (
-    senderUser?.profile_picture ? (
-      <img src={senderUser.profile_picture} className="w-12 !h-12 rounded-full object-cover shadow-md ring-2 ring-white/20 flex-shrink-0" alt={senderUser.name} />
+    senderProfilePicture ? (
+      <img src={senderProfilePicture} className="w-12 !h-12 rounded-full object-cover shadow-md ring-2 ring-white/20 flex-shrink-0" alt={senderUser.name} />
     ) : (
       <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${senderUser?.avatarGradient || 'from-gray-500 to-gray-600'} flex items-center justify-center font-bold text-white text-base flex-shrink-0 shadow-md ring-2 ring-white/20`}>
         {senderUser?.name?.charAt(0) || '?'}
