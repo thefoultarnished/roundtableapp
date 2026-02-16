@@ -539,28 +539,34 @@ export function useOnlineMode(dispatch, getState) {
 
             case 'chat_history': {
                 console.log('🎉 Received chat_history response from server!', data);
+                console.log(`🔑 CLAUDE: ===== CHAT HISTORY DECRYPTION START =====`);
                 const { userId, messages, senderPublicKey } = data;
                 const numericUserId = parseInt(userId, 10);
                 const safeUserId = isNaN(numericUserId) ? userId : numericUserId;
 
                 console.log(`📜 Received ${messages.length} messages from history for user ${safeUserId}`);
+                console.log(`🔑 CLAUDE: userId = "${userId}"`);
+                console.log(`🔑 CLAUDE: senderPublicKey provided = ${!!senderPublicKey}`);
 
                 // Decrypt messages asynchronously
                 (async () => {
                     // Import sender's public key if provided
                     let senderKey = userPublicKeys.current[String(userId)];
+                    console.log(`🔑 CLAUDE: senderKey in cache = ${!!senderKey}`);
                     if (!senderKey && senderPublicKey && keyPair) {
                         try {
+                            console.log(`🔑 CLAUDE: Importing senderPublicKey from history response`);
                             senderKey = await importPublicKey(senderPublicKey);
                             userPublicKeys.current[String(userId)] = senderKey;
                             savePeerKey(String(userId), senderPublicKey);
                             console.log(`✅ Imported public key for sender ${userId} from history`);
+                            console.log(`🔑 CLAUDE: senderPublicKey = ${JSON.stringify(senderPublicKey)}`);
                         } catch (e) {
-                            console.error(`Failed to import public key for ${userId}:`, e);
+                            console.error(`❌ CLAUDE: Failed to import public key for ${userId}:`, e);
                         }
                     }
 
-                    const formattedMessages = await Promise.all(messages.map(async (msg) => {
+                    const formattedMessages = await Promise.all(messages.map(async (msg, idx) => {
                         let decryptedText = '';
                         // Get persistent user ID (global to app)
                         const myId = localStorage.getItem('username');
@@ -571,26 +577,46 @@ export function useOnlineMode(dispatch, getState) {
                         try {
                             // Decrypt if encrypted
                             if (msg.content.encrypted && msg.content.iv && msg.content.cipher) {
-                                const safeSenderId = String(msg.senderId);
-                                let sharedKey = sharedKeys.current[safeSenderId];
+                                console.log(`🔑 CLAUDE: ===== HISTORY MESSAGE ${idx + 1} DECRYPTION =====`);
+                                console.log(`🔑 CLAUDE: msg.senderId = "${msg.senderId}"`);
+                                console.log(`🔑 CLAUDE: conversation partner (userId) = "${userId}"`);
+                                console.log(`🔑 CLAUDE: myId = "${myId}"`);
+                                console.log(`🔑 CLAUDE: isFromMe = ${isFromMe}`);
+
+                                // CRITICAL FIX: Always use the CONVERSATION PARTNER's ID for shared key cache
+                                // In ECDH, the shared key is the same regardless of who sent the message
+                                const conversationPartnerId = String(userId);
+                                let sharedKey = sharedKeys.current[conversationPartnerId];
+                                console.log(`🔑 CLAUDE: sharedKey in cache for ${conversationPartnerId} = ${!!sharedKey}`);
 
                                 // Try to derive key if missing
                                 if (!sharedKey && senderKey && keyPair) {
-                                    console.log(`Deriving shared key for sender ${safeSenderId} from history...`);
+                                    console.log(`🔑 CLAUDE: Deriving shared key for conversation with ${conversationPartnerId}...`);
+                                    console.log(`🔑 CLAUDE: Using keyPair.privateKey (type: ${keyPair.privateKey.type})`);
+                                    console.log(`🔑 CLAUDE: Using senderKey (type: ${senderKey.type})`);
                                     sharedKey = await deriveSharedKey(keyPair.privateKey, senderKey);
-                                    sharedKeys.current[safeSenderId] = sharedKey;
+                                    // Cache under conversation partner's ID, NOT sender's ID
+                                    sharedKeys.current[conversationPartnerId] = sharedKey;
+                                    console.log(`🔑 CLAUDE: Shared key derived and cached under ${conversationPartnerId} (type: ${sharedKey.type})`);
                                 }
 
                                 if (sharedKey) {
                                     try {
+                                        console.log(`🔑 CLAUDE: Attempting decryption...`);
+                                        console.log(`🔑 CLAUDE: IV length = ${msg.content.iv?.length}`);
+                                        console.log(`🔑 CLAUDE: Cipher length = ${msg.content.cipher?.length}`);
                                         decryptedText = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
+                                        console.log(`✅ CLAUDE: Decryption SUCCESS`);
                                     } catch (decErr) {
+                                        console.warn("❌ CLAUDE: Decryption FAILED:", decErr.message);
                                         console.warn("⚠️ Cannot decrypt message from history (keys may have changed):", decErr.message);
                                         decryptedText = "⚠️ Unable to decrypt (keys changed or corrupted)";
                                     }
                                 } else {
                                     decryptedText = "🔒 Encrypted (Keys not available)";
-                                    console.warn(`Missing shared key for ${safeSenderId} in history`);
+                                    console.warn(`❌ CLAUDE: Missing shared key for ${conversationPartnerId} in history`);
+                                    console.warn(`🔑 CLAUDE: senderKey available = ${!!senderKey}`);
+                                    console.warn(`🔑 CLAUDE: keyPair available = ${!!keyPair}`);
                                 }
                             } else {
                                 // Plaintext message
@@ -796,26 +822,30 @@ export function useOnlineMode(dispatch, getState) {
 
                     // Decrypt if encrypted
                     if (payload.encrypted && payload.iv && payload.cipher) {
+                        // Use sender's ID consistently for incoming messages
                         const safeSenderId = String(senderId);
                         let sharedKey = sharedKeys.current[safeSenderId];
 
                         // Try to derive key if missing
                         if (!sharedKey && userPublicKeys.current[safeSenderId] && keyPair) {
-                             console.log(`Deriving shared key for sender ${safeSenderId}...`);
+                             console.log(`🔑 Deriving shared key for conversation with ${safeSenderId}...`);
                              sharedKey = await deriveSharedKey(keyPair.privateKey, userPublicKeys.current[safeSenderId]);
+                             // Cache under sender's ID (which is the conversation partner for incoming messages)
                              sharedKeys.current[safeSenderId] = sharedKey;
+                             console.log(`🔑 Shared key derived and cached under ${safeSenderId}`);
                         }
 
                         if (sharedKey) {
                             try {
                                 finalText = await decryptMessage(payload.iv, payload.cipher, sharedKey);
+                                console.log(`✅ Real-time message decrypted successfully`);
                             } catch (decErr) {
                                 console.warn("⚠️ Cannot decrypt message (keys may have changed):", decErr.message);
                                 finalText = "⚠️ Unable to decrypt (keys changed or corrupted)";
                             }
                         } else {
                             finalText = "🔒 Encrypted (Keys not available)";
-                            console.warn(`Missing shared key for ${safeSenderId}. Has PubKey: ${!!userPublicKeys.current[safeSenderId]}`);
+                            console.warn(`❌ Missing shared key for ${safeSenderId}. Has PubKey: ${!!userPublicKeys.current[safeSenderId]}, Has keyPair: ${!!keyPair}`);
                         }
                     } else {
                         // Plaintext fallback
