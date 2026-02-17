@@ -7,6 +7,7 @@ import Particles from './components/Particles';
 import SettingsModal from './components/SettingsModal';
 import SummaryModal from './components/SummaryModal';
 import NotificationContainer from './components/NotificationContainer';
+import SplashScreen from './components/SplashScreen';
 import { useTauriIntegration } from './hooks/useTauriIntegration';
 import { useTheme } from './hooks/useTheme';
 import { useTaskbarBadge } from './hooks/useTaskbarBadge';
@@ -27,6 +28,9 @@ function AppContent() {
   useTauriIntegration();
   useTheme();
   useTaskbarBadge(state.unreadCounts); // Update Windows taskbar badge
+
+  // Splash screen visibility based on app ready state
+  const splashVisible = !state.isAppReady;
   
   const updateBackground = () => {
     const savedTheme = localStorage.getItem('theme') || 'aurora';
@@ -72,6 +76,9 @@ function AppContent() {
 
   return (
     <div className="h-screen flex flex-row overflow-hidden relative" style={{ gap: 'var(--layout-spacing)' }}>
+      {/* Splash Screen Overlay */}
+      <SplashScreen isVisible={splashVisible} />
+
       {/* Animated background layers */}
       <AuroraBackground />
       <Particles />

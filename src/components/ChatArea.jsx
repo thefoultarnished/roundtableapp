@@ -131,12 +131,22 @@ export default function ChatArea() {
   // Load blob URLs for all senders ONCE (called only when sender IDs change)
   const senderProfilePictureMap = useProfilePictureMap(uniqueSenderUsers);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages or when opening a new chat
   useEffect(() => {
-    if (messagesEndRef.current && isScrolledToBottom) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!messagesEndRef.current) return;
+
+    // Always scroll to bottom when:
+    // 1. User has scrolled to bottom and new messages arrive
+    // 2. A new chat is opened (initial load)
+    const shouldScroll = isScrolledToBottom || userMessages.length === 0 || state.activeChatUserId;
+
+    if (shouldScroll) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: userMessages.length < 60 ? 'smooth' : 'auto' });
+      }, 0);
     }
-  }, [userMessages.length, isScrolledToBottom]);
+  }, [userMessages.length, isScrolledToBottom, state.activeChatUserId]);
 
   const handleScroll = () => {
     if (messagesContainerRef.current) {

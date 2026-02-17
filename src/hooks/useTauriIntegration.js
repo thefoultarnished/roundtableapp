@@ -56,6 +56,10 @@ export function useTauriIntegration() {
   useEffect(() => {
     if (!window.__TAURI__) {
       console.warn('Tauri not detected - running in browser mode');
+      // Fallback for browser mode: dispatch SET_APP_READY after a short delay
+      setTimeout(() => {
+        dispatchRef.current({ type: 'SET_APP_READY' });
+      }, 500);
       return;
     }
 
@@ -177,7 +181,11 @@ export function useTauriIntegration() {
         if (invokeFunc) {
           invokeFunc('broadcast_discovery_query');
         }
-        setTimeout(() => announcePresenceImpl(invokeFunc), 1000);
+        setTimeout(() => {
+          announcePresenceImpl(invokeFunc);
+          // Dispatch SET_APP_READY to fade out splash screen after Tauri setup completes
+          dispatchRef.current({ type: 'SET_APP_READY' });
+        }, 1000);
 
         console.log('Tauri event listeners set up successfully');
 

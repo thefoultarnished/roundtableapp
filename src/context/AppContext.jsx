@@ -62,6 +62,9 @@ const initialState = {
 
   // Pagination: { [userId]: isLoadingOlderMessages }
   loadingOlderMessages: {},
+
+  // Splash screen
+  isAppReady: false,
 };
 
 function appReducer(state, action) {
@@ -342,6 +345,9 @@ function appReducer(state, action) {
         loadingOlderMessages: { ...state.loadingOlderMessages, [userId]: isLoading }
       };
     }
+
+    case 'SET_APP_READY':
+      return { ...state, isAppReady: true };
 
     default:
       return state;

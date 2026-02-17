@@ -614,36 +614,36 @@ export function useOnlineMode(dispatch, getState) {
                         try {
                             // Decrypt if encrypted
                             if (msg.content.encrypted && msg.content.iv && msg.content.cipher) {
-                                console.log(`🔑 CLAUDE: ===== HISTORY MESSAGE ${idx + 1} DECRYPTION =====`);
-                                console.log(`🔑 CLAUDE: msg.senderId = "${msg.senderId}"`);
-                                console.log(`🔑 CLAUDE: conversation partner (userId) = "${userId}"`);
-                                console.log(`🔑 CLAUDE: myId = "${myId}"`);
-                                console.log(`🔑 CLAUDE: isFromMe = ${isFromMe}`);
+                                // console.log(`🔑 CLAUDE: ===== HISTORY MESSAGE ${idx + 1} DECRYPTION =====`);
+                                // console.log(`🔑 CLAUDE: msg.senderId = "${msg.senderId}"`);
+                                // console.log(`🔑 CLAUDE: conversation partner (userId) = "${userId}"`);
+                                // console.log(`🔑 CLAUDE: myId = "${myId}"`);
+                                // console.log(`🔑 CLAUDE: isFromMe = ${isFromMe}`);
 
                                 // CRITICAL FIX: Always use the CONVERSATION PARTNER's ID for shared key cache
                                 // In ECDH, the shared key is the same regardless of who sent the message
                                 const conversationPartnerId = String(userId);
                                 let sharedKey = sharedKeys.current[conversationPartnerId];
-                                console.log(`🔑 CLAUDE: sharedKey in cache for ${conversationPartnerId} = ${!!sharedKey}`);
+                                // console.log(`🔑 CLAUDE: sharedKey in cache for ${conversationPartnerId} = ${!!sharedKey}`);
 
                                 // Try to derive key if missing
                                 if (!sharedKey && senderKey && keyPair) {
-                                    console.log(`🔑 CLAUDE: Deriving shared key for conversation with ${conversationPartnerId}...`);
-                                    console.log(`🔑 CLAUDE: Using keyPair.privateKey (type: ${keyPair.privateKey.type})`);
-                                    console.log(`🔑 CLAUDE: Using senderKey (type: ${senderKey.type})`);
+                                    // console.log(`🔑 CLAUDE: Deriving shared key for conversation with ${conversationPartnerId}...`);
+                                    // console.log(`🔑 CLAUDE: Using keyPair.privateKey (type: ${keyPair.privateKey.type})`);
+                                    // console.log(`🔑 CLAUDE: Using senderKey (type: ${senderKey.type})`);
                                     sharedKey = await deriveSharedKey(keyPair.privateKey, senderKey);
                                     // Cache under conversation partner's ID, NOT sender's ID
                                     sharedKeys.current[conversationPartnerId] = sharedKey;
-                                    console.log(`🔑 CLAUDE: Shared key derived and cached under ${conversationPartnerId} (type: ${sharedKey.type})`);
+                                    // console.log(`🔑 CLAUDE: Shared key derived and cached under ${conversationPartnerId} (type: ${sharedKey.type})`);
                                 }
 
                                 if (sharedKey) {
                                     try {
-                                        console.log(`🔑 CLAUDE: Attempting decryption...`);
-                                        console.log(`🔑 CLAUDE: IV length = ${msg.content.iv?.length}`);
-                                        console.log(`🔑 CLAUDE: Cipher length = ${msg.content.cipher?.length}`);
+                                        // console.log(`🔑 CLAUDE: Attempting decryption...`);
+                                        // console.log(`🔑 CLAUDE: IV length = ${msg.content.iv?.length}`);
+                                        // console.log(`🔑 CLAUDE: Cipher length = ${msg.content.cipher?.length}`);
                                         decryptedText = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
-                                        console.log(`✅ CLAUDE: Decryption SUCCESS`);
+                                        // console.log(`✅ CLAUDE: Decryption SUCCESS`);
                                     } catch (decErr) {
                                         console.warn("❌ CLAUDE: Decryption FAILED:", decErr.message);
                                         console.warn("⚠️ Cannot decrypt message from history (keys may have changed):", decErr.message);
@@ -676,6 +676,13 @@ export function useOnlineMode(dispatch, getState) {
                         };
                     }));
 
+                    // Summary: Show total messages decrypted
+                    const totalMessages = formattedMessages.length;
+                    const startNum = formattedMessages.length > 0 ? 1 : 0;
+                    const endNum = totalMessages;
+                    if (totalMessages > 0) {
+                        console.log(`🔐 HISTORY MESSAGES ${startNum} to ${endNum} DECRYPTED SUCCESSFULLY`);
+                    }
                     console.log('Formatted messages:', formattedMessages);
 
                     // Check if this is an initial load or loading older messages
