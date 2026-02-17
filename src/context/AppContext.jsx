@@ -59,6 +59,9 @@ const initialState = {
 
   // Read receipts tracking: { [userId]: lastReadMessageId }
   lastReadMessageIds: {},
+
+  // Pagination: { [userId]: isLoadingOlderMessages }
+  loadingOlderMessages: {},
 };
 
 function appReducer(state, action) {
@@ -179,6 +182,15 @@ function appReducer(state, action) {
       return {
         ...state,
         messages: { ...state.messages, [userId]: [...existing, message] },
+      };
+    }
+
+    case 'PREPEND_MESSAGES': {
+      const { userId, messages } = action.payload;
+      const existing = state.messages[userId] || [];
+      return {
+        ...state,
+        messages: { ...state.messages, [userId]: [...messages, ...existing] },
       };
     }
 
@@ -321,6 +333,14 @@ function appReducer(state, action) {
         };
       }
       return state;
+    }
+
+    case 'SET_LOADING_OLDER_MESSAGES': {
+      const { userId, isLoading } = action.payload;
+      return {
+        ...state,
+        loadingOlderMessages: { ...state.loadingOlderMessages, [userId]: isLoading }
+      };
     }
 
     default:

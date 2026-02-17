@@ -386,8 +386,8 @@ export function useOnlineMode(dispatch, getState) {
         }
     }, [keyPair]);
 
-    const requestChatHistory = useCallback((targetUserId, limit = 50, offset = 0) => {
-        console.log(`🔍 requestChatHistory called with targetUserId: ${targetUserId}`);
+    const requestChatHistory = useCallback((targetUserId, limit = 50, beforeTimestamp = null) => {
+        console.log(`🔍 requestChatHistory called with targetUserId: ${targetUserId}, beforeTimestamp: ${beforeTimestamp}`);
         console.log(`📡 WS Status: ${wsRef.current ? wsRef.current.readyState : 'null'} (OPEN=${WebSocket.OPEN})`);
 
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
@@ -402,14 +402,25 @@ export function useOnlineMode(dispatch, getState) {
             return;
         }
 
-        console.log(`📜 Requesting chat history with ${targetUserId}... (myId: ${myId})`);
-        wsRef.current.send(JSON.stringify({
+        if (beforeTimestamp) {
+            console.log(`📜 Requesting older messages before ${beforeTimestamp}...`);
+        } else {
+            console.log(`📜 Requesting initial chat history with ${targetUserId}... (myId: ${myId})`);
+        }
+
+        const payload = {
             type: 'get_chat_history',
             userId: myId,
             otherUserId: String(targetUserId),
-            limit: limit,
-            offset: offset
-        }));
+            limit: limit
+        };
+
+        // If fetching older messages, use beforeTimestamp instead of offset
+        if (beforeTimestamp) {
+            payload.before_timestamp = beforeTimestamp;
+        }
+
+        wsRef.current.send(JSON.stringify(payload));
     }, []);
 
     // Debounce timer for read receipts
@@ -667,33 +678,57 @@ export function useOnlineMode(dispatch, getState) {
 
                     console.log('Formatted messages:', formattedMessages);
 
-                    // Set messages for this user
+                    // Check if this is an initial load or loading older messages
+                    const currentMessages = getState().messages[safeUserId];
+                    const isInitialLoad = !currentMessages || currentMessages.length === 0;
+
+                    if (isInitialLoad) {
+                        // Initial load: SET all messages
+                        dispatch({
+                            type: 'SET_MESSAGES',
+                            payload: {
+                                ...getState().messages,
+                                [safeUserId]: formattedMessages
+                            }
+                        });
+                    } else if (formattedMessages.length > 0) {
+                        // Older message load: PREPEND messages
+                        console.log(`📜 Prepending ${formattedMessages.length} older messages`);
+                        dispatch({
+                            type: 'PREPEND_MESSAGES',
+                            payload: {
+                                userId: safeUserId,
+                                messages: formattedMessages
+                            }
+                        });
+                    }
+
+                    // Clear loading state for older messages
                     dispatch({
-                        type: 'SET_MESSAGES',
-                        payload: {
-                            ...getState().messages,
-                            [safeUserId]: formattedMessages
-                        }
+                        type: 'SET_LOADING_OLDER_MESSAGES',
+                        payload: { userId: safeUserId, isLoading: false }
                     });
 
-                    // Send initial read receipt for the last message from the other user
+                    // Send initial read receipt for the last message from the other user (only on initial load)
                     // This ensures that old messages (from before logout/reload) get marked as read
-                    const lastMessageFromOther = formattedMessages
-                        .slice()
-                        .reverse()
-                        .find(msg => msg.sender !== 'me');
+                    if (isInitialLoad) {
+                        const lastMessageFromOther = formattedMessages
+                            .slice()
+                            .reverse()
+                            .find(msg => msg.sender !== 'me');
 
-                    if (lastMessageFromOther?.messageId && wsRef.current?.readyState === WebSocket.OPEN) {
-                        console.log(`📮 Sending initial read receipt for chat history: ${lastMessageFromOther.messageId}`);
-                        wsRef.current.send(JSON.stringify({
-                            type: 'message_read',
-                            messageId: lastMessageFromOther.messageId
-                        }));
-                        // Update context to track this as the read boundary
-                        dispatch({
-                            type: 'UPDATE_LAST_READ_MESSAGE',
-                            payload: { userId: safeUserId, messageId: lastMessageFromOther.messageId }
-                        });
+                        if (lastMessageFromOther?.messageId && wsRef.current?.readyState === WebSocket.OPEN) {
+                            console.log(`📮 Sending initial read receipt for chat history: ${lastMessageFromOther.messageId}`);
+                            wsRef.current.send(JSON.stringify({
+                                type: 'message_read',
+                                messageId: lastMessageFromOther.messageId
+                            }));
+                            // Update context to track this as the read boundary
+                            dispatch({
+                                type: 'UPDATE_LAST_READ_MESSAGE',
+                                payload: { userId: safeUserId, messageId: lastMessageFromOther.messageId }
+                            });
+                        }
                     }
                 })();
                 break;

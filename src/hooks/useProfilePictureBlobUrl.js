@@ -180,7 +180,7 @@ export function useProfilePictureMap(users) {
     return () => {
       isMounted = false;
     };
-  }, [userIdString, loadedUserIds, users]);
+  }, [userIdString, users]);
 
   return pictureMap;
 }

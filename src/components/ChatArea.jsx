@@ -19,6 +19,7 @@ export default function ChatArea() {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const searchInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const lastRequestedTimestampRef = useRef({}); // Track last requested timestamp per user to prevent duplicates
   const [authMode, setAuthMode] = useState(null); // 'login', 'signup', or null
   const [authUsername, setAuthUsername] = useState('');
   const [authDisplayName, setAuthDisplayName] = useState('');
@@ -175,6 +176,51 @@ export default function ChatArea() {
       observer.disconnect();
     };
   }, [state.activeChatUserId, userMessages.length, dispatch]);
+
+  // Infinite scroll: detect when user scrolls to top to load older messages
+  useEffect(() => {
+    if (!state.activeChatUserId || userMessages.length === 0 || state.loadingOlderMessages?.[state.activeChatUserId]) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            // User scrolled to top, load older messages
+            const oldestMessage = userMessages[0];
+            if (oldestMessage?.timestamp && !state.loadingOlderMessages?.[state.activeChatUserId]) {
+              // Check if we've already requested this timestamp (prevent duplicates)
+              const lastRequested = lastRequestedTimestampRef.current[state.activeChatUserId];
+              if (lastRequested === oldestMessage.timestamp) {
+                console.log(`⏭️ Already loading messages before ${oldestMessage.timestamp}, skipping duplicate request`);
+                return;
+              }
+
+              console.log(`⬆️ Reached top, loading messages older than ${oldestMessage.timestamp}`);
+              lastRequestedTimestampRef.current[state.activeChatUserId] = oldestMessage.timestamp;
+
+              dispatch({
+                type: 'SET_LOADING_OLDER_MESSAGES',
+                payload: { userId: state.activeChatUserId, isLoading: true }
+              });
+              online?.requestChatHistory?.(state.activeChatUserId, 50, oldestMessage.timestamp);
+            }
+          }
+        });
+      },
+      { root: messagesContainerRef.current, threshold: 0.1 }
+    );
+
+    // Observe the FIRST message (top of list)
+    const firstMessage = messagesContainerRef.current?.querySelector('[data-message-id]');
+    if (firstMessage) {
+      observer.observe(firstMessage);
+    }
+
+    return () => {
+      if (firstMessage) observer.unobserve(firstMessage);
+      observer.disconnect();
+    };
+  }, [state.activeChatUserId, userMessages.length, online, dispatch]);
 
   // Auto-resize textarea
   const adjustTextarea = useCallback(() => {
