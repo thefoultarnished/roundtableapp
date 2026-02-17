@@ -140,10 +140,15 @@ export default function ChatArea() {
       return;
     }
 
-    // Only scroll to bottom when:
-    // 1. User has scrolled to bottom and new messages arrive
-    // 2. Messages list is empty (before any messages loaded)
-    const shouldScroll = isScrolledToBottom || userMessages.length === 0;
+    // Check if the latest message is from the user (sent by them)
+    const lastMessage = userMessages[userMessages.length - 1];
+    const isLastMessageFromUser = lastMessage?.sender === 'me';
+
+    // Scroll to bottom when:
+    // 1. User just sent a message (always scroll)
+    // 2. User has scrolled to bottom and new messages arrive
+    // 3. Messages list is empty (before any messages loaded)
+    const shouldScroll = isLastMessageFromUser || isScrolledToBottom || userMessages.length === 0;
 
     if (shouldScroll) {
       // Small delay to ensure DOM is updated
