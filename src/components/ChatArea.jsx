@@ -94,6 +94,38 @@ export default function ChatArea() {
     }
   };
 
+  // Track visible messages for read receipts
+  useEffect(() => {
+    if (!state.activeChatUserId) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const messageId = entry.target.dataset.messageId;
+            if (messageId) {
+              // Update last read message ID (debounced via action)
+              dispatch({
+                type: 'UPDATE_LAST_READ_MESSAGE',
+                payload: { userId: state.activeChatUserId, messageId }
+              });
+            }
+          }
+        });
+      },
+      { root: messagesContainerRef.current, threshold: 0.5 }
+    );
+
+    // Observe all message elements
+    const messageElements = messagesContainerRef.current?.querySelectorAll('[data-message-id]');
+    messageElements?.forEach(el => observer.observe(el));
+
+    return () => {
+      messageElements?.forEach(el => observer.unobserve(el));
+      observer.disconnect();
+    };
+  }, [state.activeChatUserId, userMessages.length, dispatch]);
+
   // Auto-resize textarea
   const adjustTextarea = useCallback(() => {
     const textarea = textareaRef.current;
@@ -178,6 +210,17 @@ export default function ChatArea() {
     setInputValue(prev => prev + emojiObject.emoji);
     setEmojiPickerOpen(false);
     textareaRef.current?.focus();
+  };
+
+  // Handle read receipts when user focuses on input (starts typing)
+  const handleInputFocus = () => {
+    setInputFocused(true);
+
+    // Send read receipt when user clicks to type a reply
+    if (state.activeChatUserId && online?.sendReadReceipts) {
+      console.log(`✍️ User focused on input, sending read receipt for ${state.activeChatUserId}`);
+      online.sendReadReceipts(state.activeChatUserId);
+    }
   };
 
   // ===== Welcome Screen =====
@@ -745,8 +788,9 @@ export default function ChatArea() {
                   
                   {/* Messages */}
                   {group.messages.map((msg, mi) => (
-                    <div 
+                    <div
                       key={`${gi}-${mi}`}
+                      data-message-id={msg.messageId}
                     >
                       <MessageBubble message={msg} />
                     </div>
@@ -906,7 +950,7 @@ export default function ChatArea() {
                 value={inputValue}
                 onChange={(e) => { setInputValue(e.target.value); adjustTextarea(); }}
                 onKeyDown={handleKeyDown}
-                onFocus={() => setInputFocused(true)}
+                onFocus={handleInputFocus}
                 onBlur={() => setInputFocused(false)}
                 className="flex-1 bg-transparent focus:outline-none text-sm text-white py-3.5 px-3 resize-none overflow-y-auto min-h-[3rem] max-h-32 border-0 placeholder:text-slate-500/60"
               />

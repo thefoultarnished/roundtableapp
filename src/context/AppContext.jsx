@@ -56,6 +56,9 @@ const initialState = {
   friends: [],
   sentFriendRequests: [],
   pendingFriendRequests: [],
+
+  // Read receipts tracking: { [userId]: lastReadMessageId }
+  lastReadMessageIds: {},
 };
 
 function appReducer(state, action) {
@@ -305,6 +308,19 @@ function appReducer(state, action) {
         return u;
       });
       return { ...state, allUsers: updatedUsers, displayedUsers: updatedUsers };
+    }
+
+    case 'UPDATE_LAST_READ_MESSAGE': {
+      const { userId, messageId } = action.payload;
+      // Only update if the new messageId is greater than the current one (string comparison works for our format)
+      const currentLastRead = state.lastReadMessageIds[userId];
+      if (!currentLastRead || messageId > currentLastRead) {
+        return {
+          ...state,
+          lastReadMessageIds: { ...state.lastReadMessageIds, [userId]: messageId }
+        };
+      }
+      return state;
     }
 
     default:

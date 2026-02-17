@@ -412,34 +412,58 @@ export function useOnlineMode(dispatch, getState) {
         }));
     }, []);
 
+    // Debounce timer for read receipts
+    const readReceiptDebounceRef = useRef({});
+
     const sendReadReceipts = useCallback((targetUserId) => {
+        // Send read receipt for the highest message from the other user (covers all messages up to that point)
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
             console.warn('❌ Cannot send read receipts: Not connected');
             return;
         }
 
-        console.log(`👁️ Sending read receipts for chat with ${targetUserId}`);
         const currentMessages = getState().messages[targetUserId] || [];
-        console.log(`📨 Found ${currentMessages.length} total messages in chat`);
 
-        let sentCount = 0;
-        currentMessages.forEach((msg, idx) => {
-            console.log(`[${idx}] Message from ${msg.sender}, read=${msg.read}, messageId=${msg.messageId}, timestamp=${msg.timestamp}`);
+        // Find the last message from the other user
+        const lastMessageFromOther = currentMessages
+            .slice()
+            .reverse()
+            .find(msg => msg.sender !== 'me');
 
-            // Send read receipt for ALL messages (not just unread ones, to ensure they're marked read)
-            if (msg.sender !== 'me') {
-                const readReceiptPayload = {
-                    type: 'message_read',
-                    messageId: msg.messageId
-                };
-                console.log(`👁️ Sending read receipt:`, readReceiptPayload);
-                wsRef.current.send(JSON.stringify(readReceiptPayload));
-                sentCount++;
-            }
-        });
+        if (lastMessageFromOther?.messageId) {
+            console.log(`👁️ Click handler: Sending read receipt for ${lastMessageFromOther.messageId}`);
+            wsRef.current.send(JSON.stringify({
+                type: 'message_read',
+                messageId: lastMessageFromOther.messageId
+            }));
 
-        console.log(`✅ Sent ${sentCount} read receipts`);
-    }, [getState]);
+            // Update context to track this as the read boundary
+            dispatch({
+                type: 'UPDATE_LAST_READ_MESSAGE',
+                payload: { userId: targetUserId, messageId: lastMessageFromOther.messageId }
+            });
+        }
+    }, [getState, dispatch]);
+
+    const sendReadReceiptForMessage = useCallback((userId, messageId) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        if (!messageId) return;
+
+        // Check if we've already sent this read receipt (avoid duplicates)
+        const key = `${userId}-${messageId}`;
+        if (readReceiptDebounceRef.current[key]) return;
+
+        // Mark as sent to avoid resending
+        readReceiptDebounceRef.current[key] = true;
+
+        const readReceiptPayload = {
+            type: 'message_read',
+            messageId: messageId
+        };
+
+        console.log(`👁️ Sending smart read receipt for message: ${messageId}`);
+        wsRef.current.send(JSON.stringify(readReceiptPayload));
+    }, []);
 
     const handleServerMessage = async (data) => {
         const { type } = data;
@@ -651,6 +675,26 @@ export function useOnlineMode(dispatch, getState) {
                             [safeUserId]: formattedMessages
                         }
                     });
+
+                    // Send initial read receipt for the last message from the other user
+                    // This ensures that old messages (from before logout/reload) get marked as read
+                    const lastMessageFromOther = formattedMessages
+                        .slice()
+                        .reverse()
+                        .find(msg => msg.sender !== 'me');
+
+                    if (lastMessageFromOther?.messageId && wsRef.current?.readyState === WebSocket.OPEN) {
+                        console.log(`📮 Sending initial read receipt for chat history: ${lastMessageFromOther.messageId}`);
+                        wsRef.current.send(JSON.stringify({
+                            type: 'message_read',
+                            messageId: lastMessageFromOther.messageId
+                        }));
+                        // Update context to track this as the read boundary
+                        dispatch({
+                            type: 'UPDATE_LAST_READ_MESSAGE',
+                            payload: { userId: safeUserId, messageId: lastMessageFromOther.messageId }
+                        });
+                    }
                 })();
                 break;
             }
@@ -1260,6 +1304,19 @@ export function useOnlineMode(dispatch, getState) {
         }));
         console.log(`👋 Sent logout message to server for user: ${userId}`);
     }, []);
+
+    // Monitor lastReadMessageIds changes and send read receipts only when boundary moves forward
+    useEffect(() => {
+        const lastReadIds = getState().lastReadMessageIds;
+        if (!lastReadIds || Object.keys(lastReadIds).length === 0) return;
+
+        // For each conversation with a lastReadMessageId, send a read receipt
+        Object.entries(lastReadIds).forEach(([userId, messageId]) => {
+            if (messageId && wsRef.current?.readyState === WebSocket.OPEN) {
+                sendReadReceiptForMessage(userId, messageId);
+            }
+        });
+    }, [getState, sendReadReceiptForMessage]);
 
     return useMemo(() => ({ connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate, sendLogout }), [connect, sendMessageOnline, isOnline, broadcastIdentity, sendIdentifyWithPassword, requestChatHistory, sendReadReceipts, validateUsername, setAuthPassword, sendFriendRequest, getFriendRequests, getFriendsList, getSentFriendRequests, acceptFriendRequest, declineFriendRequest, sendProfilePictureUpdate, sendLogout]);
 }
