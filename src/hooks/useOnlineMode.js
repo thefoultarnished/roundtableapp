@@ -743,6 +743,7 @@ export function useOnlineMode(dispatch, getState) {
                 // Update message state to mark as read
                 const currentMessages = getState().messages;
                 const updatedMessages = { ...currentMessages };
+                const usersWithReadMessages = new Set();
 
                 // Update all MY messages (messages I sent that have been read)
                 for (const userId in updatedMessages) {
@@ -750,6 +751,7 @@ export function useOnlineMode(dispatch, getState) {
                     // Match by timestamp and sender='me' (my sent messages)
                     if (msg.sender === 'me' && Math.abs(msg.timestamp - parseInt(timestamp)) < 1000) {
                       console.log(`👁️ Updated MY message at ${timestamp} to read`);
+                      usersWithReadMessages.add(userId);
                       return { ...msg, read: true, delivered: true };
                     }
                     return msg;
@@ -758,6 +760,11 @@ export function useOnlineMode(dispatch, getState) {
 
                 console.log(`👁️ After update:`, updatedMessages);
                 dispatch({ type: 'SET_MESSAGES', payload: updatedMessages });
+
+                // Clear unread count for users whose messages were just marked as read (consistent with double tick)
+                usersWithReadMessages.forEach(userId => {
+                  dispatch({ type: 'CLEAR_UNREAD', payload: userId });
+                });
                 break;
             }
 
