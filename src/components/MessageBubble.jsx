@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import * as utils from '../utils';
-import { useProfilePictureBlobUrl } from '../hooks/useProfilePictureBlobUrl';
 
-function MessageBubble({ message }) {
+function MessageBubble({ message, profilePictureMap = {} }) {
   const { state } = useAppContext();
   const isSentByMe = message.sender === 'me';
   const animClass = isSentByMe ? 'slide-in-right' : 'slide-in-left';
@@ -46,22 +45,11 @@ function MessageBubble({ message }) {
     isSentByMe ? null : state.allUsers.find(u => u.id === message.sender),
     [isSentByMe, message.sender, state.allUsers]
   );
-  // Get current user's profile picture from Redux state (same as settings area)
-  const currentUserData = isSentByMe ? state.allUsers.find(u => u.username === state.currentUser?.username) : null;
 
-  // Use blob URL for current user's profile picture
-  const { blobUrl: myProfilePicture } = useProfilePictureBlobUrl(
-    currentUserData?.username,
-    currentUserData?.profile_picture,
-    currentUserData?.profile_picture_timestamp
-  );
-
-  // Use blob URL for sender's profile picture
-  const { blobUrl: senderProfilePicture } = useProfilePictureBlobUrl(
-    senderUser?.id || senderUser?.username,
-    senderUser?.profile_picture,
-    senderUser?.profile_picture_timestamp
-  );
+  // Get profile pictures from the map (passed from ChatArea)
+  // This avoids calling the hook multiple times per message
+  const myProfilePicture = profilePictureMap['me'] || state.allUsers.find(u => u.username === state.currentUser?.username)?.profile_picture;
+  const senderProfilePicture = profilePictureMap[message.sender] || senderUser?.profile_picture;
 
   if (isSentByMe && !myProfilePicture) {
     console.warn('⚠️ MyProfilePicture is null/empty', {

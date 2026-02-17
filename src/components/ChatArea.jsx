@@ -4,7 +4,7 @@ import MessageBubble from './MessageBubble';
 import { useNetwork } from '../hooks/useNetwork';
 import EmojiPicker from 'emoji-picker-react';
 import * as utils from '../utils';
-import { useProfilePictureBlobUrl } from '../hooks/useProfilePictureBlobUrl';
+import { useProfilePictureBlobUrl, useProfilePictureMap } from '../hooks/useProfilePictureBlobUrl';
 
 export default function ChatArea() {
   const { state, dispatch, online } = useAppContext();
@@ -79,6 +79,56 @@ export default function ChatArea() {
   );
   const userMessages = state.activeChatUserId ? (state.messages[state.activeChatUserId] || []) : [];
   const groupedMessages = useMemo(() => utils.groupMessagesByDate(userMessages), [userMessages]);
+
+  // Load profile pictures ONCE for all senders in this chat (optimization)
+  // Get unique senders from messages (memoized by sender IDs, not array reference)
+  const senderIds = useMemo(() => {
+    const ids = new Set();
+    const currentUser = state.allUsers.find(u => u.username === state.currentUser?.username);
+
+    // Always include current user for 'me' messages
+    if (currentUser) {
+      ids.add('me');
+    }
+
+    // Include all unique sender IDs from messages
+    userMessages.forEach(msg => {
+      if (msg.sender !== 'me') {
+        ids.add(msg.sender);
+      }
+    });
+
+    // Return sorted string for stable comparison
+    return Array.from(ids).sort().join(',');
+  }, [userMessages, state.allUsers, state.currentUser?.username]);
+
+  // Build user objects only when sender IDs change
+  const uniqueSenderUsers = useMemo(() => {
+    const senderMap = {};
+    const currentUser = state.allUsers.find(u => u.username === state.currentUser?.username);
+
+    if (currentUser) {
+      senderMap['me'] = currentUser;
+    }
+
+    // Split sender IDs and filter out empty strings
+    if (senderIds && senderIds.trim()) {
+      senderIds.split(',').forEach(id => {
+        id = id.trim();
+        if (id && id !== 'me') {
+          const user = state.allUsers.find(u => u.id === id);
+          if (user) {
+            senderMap[id] = user;
+          }
+        }
+      });
+    }
+
+    return Object.values(senderMap);
+  }, [senderIds, state.allUsers, state.currentUser?.username]);
+
+  // Load blob URLs for all senders ONCE (called only when sender IDs change)
+  const senderProfilePictureMap = useProfilePictureMap(uniqueSenderUsers);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -792,7 +842,7 @@ export default function ChatArea() {
                       key={`${gi}-${mi}`}
                       data-message-id={msg.messageId}
                     >
-                      <MessageBubble message={msg} />
+                      <MessageBubble message={msg} profilePictureMap={senderProfilePictureMap} />
                     </div>
                   ))}
                 </React.Fragment>
