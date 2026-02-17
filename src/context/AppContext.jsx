@@ -199,9 +199,19 @@ function appReducer(state, action) {
       const { userId, messages: newMessages } = action.payload;
       const existing = state.messages[userId] || [];
 
-      // Deduplicate: filter out messages that already exist
-      const existingIds = new Set(existing.map(m => m.messageId).filter(Boolean));
-      const filtered = newMessages.filter(m => !m.messageId || !existingIds.has(m.messageId));
+      // Build lookup set using messageId AND sender+timestamp as fallback
+      // This handles cases where messageId format differs between IndexedDB and server
+      const existingKeys = new Set();
+      existing.forEach(m => {
+        if (m.messageId) existingKeys.add(`id:${m.messageId}`);
+        if (m.timestamp && m.sender) existingKeys.add(`ts:${m.sender}:${m.timestamp}`);
+      });
+
+      const filtered = newMessages.filter(m => {
+        if (m.messageId && existingKeys.has(`id:${m.messageId}`)) return false;
+        if (m.timestamp && m.sender && existingKeys.has(`ts:${m.sender}:${m.timestamp}`)) return false;
+        return true;
+      });
 
       return {
         ...state,

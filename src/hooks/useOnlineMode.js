@@ -416,8 +416,9 @@ export function useOnlineMode(dispatch, getState) {
         };
 
         // If fetching older messages, use beforeTimestamp instead of offset
+        // Convert ms to seconds if needed — server expects Unix seconds
         if (beforeTimestamp) {
-            payload.before_timestamp = beforeTimestamp;
+            payload.before_timestamp = beforeTimestamp > 1e12 ? Math.floor(beforeTimestamp / 1000) : beforeTimestamp;
         }
 
         wsRef.current.send(JSON.stringify(payload));
@@ -664,11 +665,13 @@ export function useOnlineMode(dispatch, getState) {
                             decryptedText = '⚠️ Error';
                         }
 
+                        // Normalize timestamp to ms — server may return seconds (< 1e12)
+                        const normalizedTs = msg.timestamp < 1e12 ? msg.timestamp * 1000 : msg.timestamp;
                         return {
                             sender: isFromMe ? 'me' : msg.senderId,
                             text: decryptedText,
-                            time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            timestamp: msg.timestamp,
+                            time: new Date(normalizedTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            timestamp: normalizedTs,
                             messageId: msg.messageId,
                             files: [],
                             delivered: msg.delivered,
@@ -968,13 +971,15 @@ export function useOnlineMode(dispatch, getState) {
                     }
 
                     // Save encrypted message to IndexedDB for persistence
+                    // Use server's timestamp (converted to ms) so before_timestamp queries match
+                    const serverTs = data.timestamp ? (data.timestamp < 1e12 ? data.timestamp * 1000 : data.timestamp) : Date.now();
                     saveEncryptedMessage({
                         friendId: safeSenderId,
                         senderId: safeSenderId,
                         content: payload.encrypted && payload.iv && payload.cipher
                             ? { encrypted: true, iv: payload.iv, cipher: payload.cipher }
                             : { encrypted: false, text: payload.text || finalText },
-                        timestamp: Date.now(),
+                        timestamp: serverTs,
                         messageId: data.messageId,
                         sender: safeSenderId
                     })
@@ -989,7 +994,7 @@ export function useOnlineMode(dispatch, getState) {
                                 sender: safeSenderId,
                                 text: finalText,
                                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                timestamp: Date.now(),
+                                timestamp: serverTs,
                                 messageId: data.messageId,
                                 delivered: false,
                                 read: false
@@ -1153,43 +1158,30 @@ export function useOnlineMode(dispatch, getState) {
 
     // Request chat history when active chat changes
     useEffect(() => {
-        console.log('🔄 useEffect triggered: Checking active chat user...');
         const activeUserId = getState().activeChatUserId;
-        console.log(`📌 Active Chat User ID: ${activeUserId}`);
+        if (!activeUserId) return;
 
-        if (activeUserId) {
-            // 1️⃣ FIRST: Load messages from IndexedDB (instant display)
+        // Load last N messages from IndexedDB instantly — no server request on open.
+        // Server is only contacted when user scrolls to top (via ChatArea scroll handler).
+        // New real-time messages arrive via WebSocket automatically.
+        const currentMessages = getState().messages[activeUserId] || [];
+        if (currentMessages.length === 0) {
             loadMessagesByFriend(activeUserId).then(cachedMessages => {
                 if (cachedMessages && cachedMessages.length > 0) {
                     console.log(`📚 Loaded ${cachedMessages.length} messages from IndexedDB for ${activeUserId}`);
-                    // Display cached messages immediately
-                    const currentMessages = getState().messages[activeUserId] || [];
-                    if (currentMessages.length === 0) {
-                        dispatch({
-                            type: 'SET_MESSAGES',
-                            payload: {
-                                ...getState().messages,
-                                [activeUserId]: cachedMessages
-                            }
-                        });
-                    }
+                    dispatch({
+                        type: 'SET_MESSAGES',
+                        payload: {
+                            ...getState().messages,
+                            [activeUserId]: cachedMessages
+                        }
+                    });
                 } else {
-                    console.log(`📚 No cached messages found in IndexedDB for ${activeUserId}`);
+                    console.log(`📚 No cached messages in IndexedDB for ${activeUserId}`);
                 }
             }).catch(err => console.error('📚 Error loading from IndexedDB:', err));
-
-            // 2️⃣ LATER: If websocket is ready, request newer messages from server
-            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-                console.log(`✅ Requesting new messages from server for ${activeUserId}`);
-                const timeout = setTimeout(() => {
-                    requestChatHistory(activeUserId);
-                }, 100);
-                return () => clearTimeout(timeout);
-            }
-        } else {
-            console.warn('⚠️ No active chat user');
         }
-    }, [getState, requestChatHistory, dispatch]);
+    }, [getState, dispatch]);
 
     const validateUsername = useCallback((username, password, mode) => {
         return new Promise((resolve) => {
