@@ -135,10 +135,15 @@ export default function ChatArea() {
   useEffect(() => {
     if (!messagesEndRef.current) return;
 
-    // Always scroll to bottom when:
+    // Don't auto-scroll if we're currently loading older messages from the top
+    if (state.loadingOlderMessages?.[state.activeChatUserId]) {
+      return;
+    }
+
+    // Only scroll to bottom when:
     // 1. User has scrolled to bottom and new messages arrive
-    // 2. A new chat is opened (initial load)
-    const shouldScroll = isScrolledToBottom || userMessages.length === 0 || state.activeChatUserId;
+    // 2. Messages list is empty (before any messages loaded)
+    const shouldScroll = isScrolledToBottom || userMessages.length === 0;
 
     if (shouldScroll) {
       // Small delay to ensure DOM is updated
@@ -146,7 +151,7 @@ export default function ChatArea() {
         messagesEndRef.current?.scrollIntoView({ behavior: userMessages.length < 60 ? 'smooth' : 'auto' });
       }, 0);
     }
-  }, [userMessages.length, isScrolledToBottom, state.activeChatUserId]);
+  }, [userMessages.length, isScrolledToBottom, state.activeChatUserId, state.loadingOlderMessages]);
 
   const handleScroll = () => {
     if (messagesContainerRef.current) {
@@ -330,7 +335,7 @@ export default function ChatArea() {
   };
 
   // ===== Welcome Screen =====
-  if (!state.activeChatUserId) {
+  if (!state.activeChatUserId || !activeUser) {
     // Auth UI if not logged in
     if (!state.currentUser) {
       return (

@@ -54,7 +54,7 @@ function MessageBubble({ message, profilePictureMap = {} }) {
   if (isSentByMe && !myProfilePicture) {
     console.warn('⚠️ MyProfilePicture is null/empty', {
       currentUser: state.currentUser?.username,
-      currentUserData,
+      currentUserData: state.currentUser,
       allUsersCount: state.allUsers.length,
       allUsers: state.allUsers.map(u => ({ username: u.username, hasPic: !!u.profile_picture }))
     });

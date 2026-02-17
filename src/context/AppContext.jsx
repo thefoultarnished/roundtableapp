@@ -182,6 +182,13 @@ function appReducer(state, action) {
     case 'ADD_MESSAGE': {
       const { userId, message } = action.payload;
       const existing = state.messages[userId] || [];
+
+      // Deduplicate: check if message with same messageId already exists
+      if (message.messageId && existing.some(m => m.messageId === message.messageId)) {
+        console.warn(`⚠️ Duplicate message received (ID: ${message.messageId}), skipping`);
+        return state;
+      }
+
       return {
         ...state,
         messages: { ...state.messages, [userId]: [...existing, message] },
@@ -189,11 +196,16 @@ function appReducer(state, action) {
     }
 
     case 'PREPEND_MESSAGES': {
-      const { userId, messages } = action.payload;
+      const { userId, messages: newMessages } = action.payload;
       const existing = state.messages[userId] || [];
+
+      // Deduplicate: filter out messages that already exist
+      const existingIds = new Set(existing.map(m => m.messageId).filter(Boolean));
+      const filtered = newMessages.filter(m => !m.messageId || !existingIds.has(m.messageId));
+
       return {
         ...state,
-        messages: { ...state.messages, [userId]: [...messages, ...existing] },
+        messages: { ...state.messages, [userId]: [...filtered, ...existing] },
       };
     }
 
