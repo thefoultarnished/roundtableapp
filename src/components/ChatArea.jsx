@@ -20,6 +20,7 @@ export default function ChatArea() {
   const searchInputRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const lastRequestedTimestampRef = useRef({}); // Track last requested timestamp per user to prevent duplicates
+  const justSentMessageRef = useRef(false); // True only when user actively sends a message
   const [authMode, setAuthMode] = useState(null); // 'login', 'signup', or null
   const [authUsername, setAuthUsername] = useState('');
   const [authDisplayName, setAuthDisplayName] = useState('');
@@ -140,18 +141,19 @@ export default function ChatArea() {
       return;
     }
 
-    // Check if the latest message is from the user (sent by them)
-    const lastMessage = userMessages[userMessages.length - 1];
-    const isLastMessageFromUser = lastMessage?.sender === 'me';
+    // Check if user actively just sent a message (set in handleSubmit)
+    const userJustSent = justSentMessageRef.current;
+    if (userJustSent) {
+      justSentMessageRef.current = false; // Reset immediately
+    }
 
     // Scroll to bottom when:
-    // 1. User just sent a message (always scroll)
-    // 2. User has scrolled to bottom and new messages arrive
-    // 3. Messages list is empty (before any messages loaded)
-    const shouldScroll = isLastMessageFromUser || isScrolledToBottom || userMessages.length === 0;
+    // 1. User just actively sent a message
+    // 2. User is already near the bottom and a new message arrives
+    // 3. No messages yet (initial empty state)
+    const shouldScroll = userJustSent || isScrolledToBottom || userMessages.length === 0;
 
     if (shouldScroll) {
-      // Small delay to ensure DOM is updated
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: userMessages.length < 60 ? 'smooth' : 'auto' });
       }, 0);
@@ -285,6 +287,7 @@ export default function ChatArea() {
     }
 
     if (sent) {
+      justSentMessageRef.current = true; // Flag so scroll effect knows to scroll to bottom
       setInputValue('');
       dispatch({ type: 'CLEAR_SELECTED_FILES' });
       if (textareaRef.current) textareaRef.current.style.height = '48px';

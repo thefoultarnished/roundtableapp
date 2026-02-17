@@ -6,6 +6,13 @@
 const DB_NAME = 'RoundtableDB';
 const DB_VERSION = 2;
 
+// ===== CONFIG: Change this value to limit messages per conversation =====
+// Set to null or Infinity to keep ALL messages (recommended for single user)
+// Set to 50 to keep only last 50 messages per conversation
+// Set to 1000 to keep last 1000 messages per conversation
+export const MAX_MESSAGES_PER_CONVERSATION = 15; // Store last 15 messages per conversation
+// =========================================================================
+
 // Object stores (tables)
 const STORES = {
   MESSAGES: 'messages',
@@ -74,6 +81,10 @@ export async function saveMessage(message) {
 
     request.onsuccess = () => {
       console.log('🗄️ IndexedDB - DEBUG: Message saved with ID:', request.result);
+      // Clean up old messages (keep only last 50 per friend)
+      cleanupOldMessages(message.friendId).catch(err =>
+        console.warn('🗄️ IndexedDB - Cleanup warning:', err)
+      );
       resolve();
     };
     request.onerror = () => {
@@ -96,8 +107,72 @@ export async function saveMessages(messages) {
 
     messages.forEach(msg => store.add(msg));
 
-    transaction.oncomplete = () => resolve();
+    transaction.oncomplete = () => {
+      // Clean up old messages for each unique friend
+      const uniqueFriends = [...new Set(messages.map(m => m.friendId))];
+      Promise.all(uniqueFriends.map(friendId => cleanupOldMessages(friendId)))
+        .then(() => resolve())
+        .catch(err => {
+          console.warn('🗄️ IndexedDB - Cleanup warning after bulk save:', err);
+          resolve(); // Don't fail the save if cleanup fails
+        });
+    };
     transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+/**
+ * Clean up old messages - keep only the last N messages per friend
+ * Uses MAX_MESSAGES_PER_CONVERSATION setting (null = unlimited)
+ * @param {string} friendId - Friend's user ID
+ * @returns {Promise<void>}
+ */
+async function cleanupOldMessages(friendId) {
+  // Skip cleanup if limit is not set (null or Infinity = keep all)
+  if (!MAX_MESSAGES_PER_CONVERSATION || MAX_MESSAGES_PER_CONVERSATION === Infinity) {
+    return Promise.resolve();
+  }
+
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.MESSAGES], 'readwrite');
+    const store = transaction.objectStore(STORES.MESSAGES);
+    const index = store.index('friendId');
+    const request = index.getAll(friendId);
+
+    request.onsuccess = () => {
+      const messages = request.result || [];
+
+      if (messages.length > MAX_MESSAGES_PER_CONVERSATION) {
+        // Sort by timestamp to identify oldest messages
+        messages.sort((a, b) => a.timestamp - b.timestamp);
+
+        // Delete oldest messages, keeping only the limit
+        const messagesToDelete = messages.slice(0, messages.length - MAX_MESSAGES_PER_CONVERSATION);
+        console.log(`🗄️ IndexedDB - Cleaning up ${messagesToDelete.length} old messages for friend ${friendId}`);
+
+        const deleteTransaction = db.transaction([STORES.MESSAGES], 'readwrite');
+        const deleteStore = deleteTransaction.objectStore(STORES.MESSAGES);
+
+        messagesToDelete.forEach(msg => {
+          if (msg.id) {
+            deleteStore.delete(msg.id);
+          }
+        });
+
+        deleteTransaction.oncomplete = () => {
+          console.log(`🗄️ IndexedDB - Kept last ${MAX_MESSAGES_PER_CONVERSATION} messages for friend ${friendId}`);
+          resolve();
+        };
+        deleteTransaction.onerror = () => {
+          console.warn('🗄️ IndexedDB - Cleanup failed:', deleteTransaction.error);
+          reject(deleteTransaction.error);
+        };
+      } else {
+        resolve();
+      }
+    };
+    request.onerror = () => reject(request.error);
   });
 }
 

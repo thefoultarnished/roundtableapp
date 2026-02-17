@@ -51,14 +51,6 @@ function MessageBubble({ message, profilePictureMap = {} }) {
   const myProfilePicture = profilePictureMap['me'] || state.allUsers.find(u => u.username === state.currentUser?.username)?.profile_picture;
   const senderProfilePicture = profilePictureMap[message.sender] || senderUser?.profile_picture;
 
-  if (isSentByMe && !myProfilePicture) {
-    console.warn('⚠️ MyProfilePicture is null/empty', {
-      currentUser: state.currentUser?.username,
-      currentUserData: state.currentUser,
-      allUsersCount: state.allUsers.length,
-      allUsers: state.allUsers.map(u => ({ username: u.username, hasPic: !!u.profile_picture }))
-    });
-  }
 
   // Glass message style
   const sentStyle = 'bg-gradient-to-br from-teal-500/90 to-cyan-600/90 text-white shadow-lg shadow-teal-500/15';

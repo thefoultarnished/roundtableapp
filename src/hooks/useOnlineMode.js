@@ -5,7 +5,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { isWindowFocused } from '../utils';
 import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage, deriveKeyPairFromPassword } from '../utils/crypto';
 import { setCachedProfilePic } from '../utils/profilePictureCache';
-import { saveMessage as saveEncryptedMessage } from '../utils/indexedDB';
+import { saveMessage as saveEncryptedMessage, MAX_MESSAGES_PER_CONVERSATION, loadMessagesByFriend } from '../utils/indexedDB';
 import { cacheProfilePictureBlob, clearAllProfilePictureBlobsWithRevoke } from '../utils/profilePictureBlobCache';
 import { blobUrlManager } from '../utils/blobUrlManager';
 
@@ -676,12 +676,11 @@ export function useOnlineMode(dispatch, getState) {
                         };
                     }));
 
-                    // Summary: Show total messages decrypted
+                    // Summary: Show total messages decrypted and how many will be stored
                     const totalMessages = formattedMessages.length;
-                    const startNum = formattedMessages.length > 0 ? 1 : 0;
-                    const endNum = totalMessages;
+                    const storedLimit = MAX_MESSAGES_PER_CONVERSATION ? `${MAX_MESSAGES_PER_CONVERSATION} in IndexedDB` : 'all (unlimited)';
                     if (totalMessages > 0) {
-                        console.log(`🔐 HISTORY MESSAGES ${startNum} to ${endNum} DECRYPTED SUCCESSFULLY`);
+                        console.log(`🔐 HISTORY: DECRYPTED ${totalMessages} messages (will keep last ${storedLimit})`);
                     }
                     console.log('Formatted messages:', formattedMessages);
 
@@ -1157,21 +1156,40 @@ export function useOnlineMode(dispatch, getState) {
         console.log('🔄 useEffect triggered: Checking active chat user...');
         const activeUserId = getState().activeChatUserId;
         console.log(`📌 Active Chat User ID: ${activeUserId}`);
-        console.log(`📡 WS Open: ${wsRef.current?.readyState === WebSocket.OPEN}`);
 
-        if (activeUserId && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            console.log(`✅ Conditions met, requesting history for ${activeUserId}`);
-            // Small delay to ensure connection is fully ready
-            const timeout = setTimeout(() => {
-                requestChatHistory(activeUserId);
-            }, 100);
-            return () => clearTimeout(timeout);
+        if (activeUserId) {
+            // 1️⃣ FIRST: Load messages from IndexedDB (instant display)
+            loadMessagesByFriend(activeUserId).then(cachedMessages => {
+                if (cachedMessages && cachedMessages.length > 0) {
+                    console.log(`📚 Loaded ${cachedMessages.length} messages from IndexedDB for ${activeUserId}`);
+                    // Display cached messages immediately
+                    const currentMessages = getState().messages[activeUserId] || [];
+                    if (currentMessages.length === 0) {
+                        dispatch({
+                            type: 'SET_MESSAGES',
+                            payload: {
+                                ...getState().messages,
+                                [activeUserId]: cachedMessages
+                            }
+                        });
+                    }
+                } else {
+                    console.log(`📚 No cached messages found in IndexedDB for ${activeUserId}`);
+                }
+            }).catch(err => console.error('📚 Error loading from IndexedDB:', err));
+
+            // 2️⃣ LATER: If websocket is ready, request newer messages from server
+            if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                console.log(`✅ Requesting new messages from server for ${activeUserId}`);
+                const timeout = setTimeout(() => {
+                    requestChatHistory(activeUserId);
+                }, 100);
+                return () => clearTimeout(timeout);
+            }
         } else {
-            if (!activeUserId) console.warn('⚠️ No active chat user');
-            if (!wsRef.current) console.warn('⚠️ No websocket connection');
-            if (wsRef.current && wsRef.current.readyState !== WebSocket.OPEN) console.warn(`⚠️ WS not open, state: ${wsRef.current.readyState}`);
+            console.warn('⚠️ No active chat user');
         }
-    }, [getState, requestChatHistory]);
+    }, [getState, requestChatHistory, dispatch]);
 
     const validateUsername = useCallback((username, password, mode) => {
         return new Promise((resolve) => {
