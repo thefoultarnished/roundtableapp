@@ -746,15 +746,15 @@ function handleIdentify(ws, data) {
 
 // Route Encrypted Message
 function handleRouteMessage(ws, data) {
-  const { targetId, payload } = data;
+  const { targetId, payload, messageId: clientMessageId } = data;
 
   if (!targetId || !payload) return;
 
   const target = connectedUsers.get(targetId);
   const now = Date.now();
 
-  // Generate unique message ID
-  const messageId = `${ws.userId}-${targetId}-${now}`;
+  // Use client-provided messageId, fall back to server-generated for backward compat
+  const messageId = clientMessageId || `${ws.userId}-${targetId}-${now}`;
 
   if (target && target.socket.readyState === WebSocket.OPEN) {
     // User is ONLINE - deliver immediately
@@ -785,6 +785,7 @@ function handleRouteMessage(ws, data) {
     }
 
     // Send delivery confirmation to sender (message reached recipient)
+    // Include the server's timestamp so sender can update their local copy
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
@@ -792,6 +793,7 @@ function handleRouteMessage(ws, data) {
           messageId: messageId,
           recipientId: targetId,
           delivered: true,
+          timestamp: now,
         }),
       );
     }
@@ -811,12 +813,13 @@ function handleRouteMessage(ws, data) {
         0, // Not delivered yet
       );
 
-      // Send acknowledgment to sender
+      // Send acknowledgment to sender with server's timestamp
       ws.send(
         JSON.stringify({
           type: "message_queued",
           targetId: targetId,
           messageId: messageId,
+          timestamp: now,
         }),
       );
     } catch (err) {
@@ -893,7 +896,7 @@ function broadcastUserList() {
 
 // Handle Get Chat History Request
 function handleGetChatHistory(ws, data) {
-  const { userId, otherUserId, limit = 50, offset = 0 } = data;
+  const { userId, otherUserId, limit = 50, before_timestamp = null } = data;
 
   if (!userId || !otherUserId) {
     ws.send(
@@ -906,15 +909,37 @@ function handleGetChatHistory(ws, data) {
   }
 
   try {
-    // Fetch messages between the two users with pagination
-    const messages = getChatHistory.all(
-      userId,
-      otherUserId,
-      otherUserId,
-      userId,
-      limit,
-      offset,
-    );
+    // If before_timestamp is provided, fetch messages BEFORE that timestamp
+    let messages;
+    if (before_timestamp) {
+      console.log(`📜 Fetching messages before timestamp ${before_timestamp} (ms)`);
+
+      const getHistoryBeforeTs = db.prepare(`
+        SELECT * FROM messages
+        WHERE ((sender_id = ? AND recipient_id = ?) OR (sender_id = ? AND recipient_id = ?))
+        AND timestamp < ?
+        ORDER BY timestamp DESC
+        LIMIT ?
+      `);
+      messages = getHistoryBeforeTs.all(
+        userId,
+        otherUserId,
+        otherUserId,
+        userId,
+        before_timestamp,
+        limit,
+      );
+    } else {
+      // Fetch messages between the two users with offset-based pagination
+      messages = getChatHistory.all(
+        userId,
+        otherUserId,
+        otherUserId,
+        userId,
+        limit,
+        0, // Always use offset 0 for initial load
+      );
+    }
 
     // Get sender's public key from database
     const getSenderKey = db.prepare(
@@ -980,8 +1005,6 @@ function handleMessageDelivered(data) {
 function handleMessageRead(data) {
   const { messageId } = data;
 
-  console.log(`📬 Received message_read for:`, messageId);
-
   if (!messageId) {
     console.warn("⚠️ No messageId in message_read event");
     return;
@@ -991,16 +1014,14 @@ function handleMessageRead(data) {
     markMessageRead.run(messageId);
     console.log(`👁️  Message ${messageId} marked as read in database`);
 
-    // Extract sender ID from messageId format: senderId-recipientId-timestamp
-    const parts = messageId.split("-");
-    console.log(`📝 MessageId parts:`, parts);
+    // Look up the sender from the database
+    const msgRow = db
+      .prepare(`SELECT sender_id FROM messages WHERE message_id = ?`)
+      .get(messageId);
 
-    if (parts.length >= 2) {
-      const senderId = parts[0]; // The original sender
-      console.log(`🔍 Looking for sender: ${senderId}`);
-
+    if (msgRow) {
+      const senderId = msgRow.sender_id;
       const sender = connectedUsers.get(senderId);
-      console.log(`📡 Sender connected:`, !!sender);
 
       // Send read confirmation to sender if they're online
       if (sender && sender.socket.readyState === WebSocket.OPEN) {
@@ -1011,11 +1032,9 @@ function handleMessageRead(data) {
             messageId: messageId,
           }),
         );
-      } else {
-        console.warn(`⚠️ Sender ${senderId} not connected or socket not open`);
       }
     } else {
-      console.warn(`⚠️ Invalid messageId format:`, messageId);
+      console.warn(`⚠️ Message ${messageId} not found in database`);
     }
   } catch (err) {
     console.error("Failed to mark message as read:", err);

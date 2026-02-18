@@ -5,7 +5,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { isWindowFocused } from '../utils';
 import { generateKeyPair, exportKey, importPrivateKey, importPublicKey, deriveSharedKey, encryptMessage, decryptMessage, deriveKeyPairFromPassword } from '../utils/crypto';
 import { setCachedProfilePic } from '../utils/profilePictureCache';
-import { saveMessage as saveEncryptedMessage, MAX_MESSAGES_PER_CONVERSATION, loadMessagesByFriend } from '../utils/indexedDB';
+import { saveMessage as saveEncryptedMessage, updateMessageByMessageId, MAX_MESSAGES_PER_CONVERSATION, loadMessagesByFriend } from '../utils/indexedDB';
 import { cacheProfilePictureBlob, clearAllProfilePictureBlobsWithRevoke } from '../utils/profilePictureBlobCache';
 import { blobUrlManager } from '../utils/blobUrlManager';
 
@@ -415,10 +415,10 @@ export function useOnlineMode(dispatch, getState) {
             limit: limit
         };
 
-        // If fetching older messages, use beforeTimestamp instead of offset
-        // Convert ms to seconds if needed — server expects Unix seconds
+        // If fetching older messages, use beforeTimestamp
+        // Server stores timestamps in milliseconds, so send milliseconds
         if (beforeTimestamp) {
-            payload.before_timestamp = beforeTimestamp > 1e12 ? Math.floor(beforeTimestamp / 1000) : beforeTimestamp;
+            payload.before_timestamp = beforeTimestamp; // Server uses milliseconds
         }
 
         wsRef.current.send(JSON.stringify(payload));
@@ -745,31 +745,32 @@ export function useOnlineMode(dispatch, getState) {
 
             case 'message_delivery_confirmation': {
                 console.log('📬 Message delivered:', data);
-                const { messageId, recipientId } = data;
+                const { messageId, recipientId, timestamp: serverTimestamp } = data;
 
-                // Extract timestamp from messageId (format: sender-recipient-timestamp)
-                const parts = messageId.split('-');
-                const timestamp = parts[parts.length - 1]; // Last part is timestamp
-
-                console.log(`📬 Looking for message with timestamp ${timestamp} in chat ${recipientId}`);
-
-                // Update message state to mark as delivered
+                // Update message state to mark as delivered + set server timestamp
                 const currentMessages = getState().messages;
                 const updatedMessages = { ...currentMessages };
 
-                // Update the message in the specific user's chat
                 if (updatedMessages[recipientId]) {
                   updatedMessages[recipientId] = updatedMessages[recipientId].map(msg => {
-                    // Match by timestamp (within 1 second) and sender='me'
-                    if (msg.sender === 'me' && Math.abs(msg.timestamp - parseInt(timestamp)) < 1000) {
-                      console.log(`✅ Updated message ${timestamp} to delivered`);
-                      return { ...msg, delivered: true, messageId: messageId };
+                    if (msg.messageId === messageId) {
+                      console.log(`✅ Updated message ${messageId} to delivered, server timestamp: ${serverTimestamp}`);
+                      return { ...msg, delivered: true, timestamp: serverTimestamp || msg.timestamp };
                     }
                     return msg;
                   });
                 }
 
                 dispatch({ type: 'SET_MESSAGES', payload: updatedMessages });
+
+                // Update IndexedDB with server timestamp
+                if (serverTimestamp) {
+                    updateMessageByMessageId(messageId, { timestamp: serverTimestamp, delivered: true })
+                        .then(found => {
+                            if (found) console.log(`🗄️ IndexedDB - Updated timestamp for ${messageId}`);
+                        })
+                        .catch(err => console.warn('🗄️ IndexedDB - Failed to update timestamp:', err));
+                }
                 break;
             }
 
@@ -777,24 +778,16 @@ export function useOnlineMode(dispatch, getState) {
                 console.log('👁️ Message read confirmation:', data);
                 const { messageId } = data;
 
-                // Extract sender and timestamp from messageId (format: sender-recipient-timestamp)
-                const parts = messageId.split('-');
-                const senderId = parts[0];
-                const timestamp = parts[parts.length - 1];
-
-                console.log(`👁️ Looking for MY message (${senderId}) with timestamp ${timestamp}`);
-
                 // Update message state to mark as read
                 const currentMessages = getState().messages;
                 const updatedMessages = { ...currentMessages };
                 const usersWithReadMessages = new Set();
 
-                // Update all MY messages (messages I sent that have been read)
+                // Find and update the message by messageId
                 for (const userId in updatedMessages) {
                   updatedMessages[userId] = updatedMessages[userId].map(msg => {
-                    // Match by timestamp and sender='me' (my sent messages)
-                    if (msg.sender === 'me' && Math.abs(msg.timestamp - parseInt(timestamp)) < 1000) {
-                      console.log(`👁️ Updated MY message at ${timestamp} to read`);
+                    if (msg.messageId === messageId) {
+                      console.log(`👁️ Updated message ${messageId} to read`);
                       usersWithReadMessages.add(userId);
                       return { ...msg, read: true, delivered: true };
                     }
@@ -802,13 +795,33 @@ export function useOnlineMode(dispatch, getState) {
                   });
                 }
 
-                console.log(`👁️ After update:`, updatedMessages);
                 dispatch({ type: 'SET_MESSAGES', payload: updatedMessages });
 
-                // Clear unread count for users whose messages were just marked as read (consistent with double tick)
+                // Clear unread count for users whose messages were just marked as read
                 usersWithReadMessages.forEach(userId => {
                   dispatch({ type: 'CLEAR_UNREAD', payload: userId });
                 });
+                break;
+            }
+
+            case 'message_queued': {
+                // Recipient was offline — server queued the message. Update IndexedDB with server timestamp.
+                const { messageId, timestamp: serverTimestamp } = data;
+                if (serverTimestamp && messageId) {
+                    updateMessageByMessageId(messageId, { timestamp: serverTimestamp })
+                        .catch(err => console.warn('🗄️ IndexedDB - Failed to update queued msg timestamp:', err));
+
+                    // Also update in-memory state timestamp
+                    const currentMessages = getState().messages;
+                    const updatedMessages = { ...currentMessages };
+                    const targetUserId = data.targetId;
+                    if (targetUserId && updatedMessages[targetUserId]) {
+                        updatedMessages[targetUserId] = updatedMessages[targetUserId].map(msg =>
+                            msg.messageId === messageId ? { ...msg, timestamp: serverTimestamp } : msg
+                        );
+                        dispatch({ type: 'SET_MESSAGES', payload: updatedMessages });
+                    }
+                }
                 break;
             }
 
@@ -1110,17 +1123,18 @@ export function useOnlineMode(dispatch, getState) {
         }
 
         if (payload) {
+            const msgTimestamp = Date.now();
+            const myMessageId = crypto.randomUUID();
+
             wsRef.current.send(JSON.stringify({
                 type: 'message',
                 targetId: safeTargetId,
-                payload: payload
+                payload: payload,
+                messageId: myMessageId
             }));
 
             const numericTargetId = parseInt(safeTargetId, 10);
             const finalTargetId = isNaN(numericTargetId) ? safeTargetId : numericTargetId;
-
-            const msgTimestamp = Date.now();
-            const myMessageId = `${localStorage.getItem('username')}-${finalTargetId}-${msgTimestamp}`;
 
             // Save encrypted message to IndexedDB
             saveEncryptedMessage({

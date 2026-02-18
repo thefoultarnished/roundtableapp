@@ -199,23 +199,33 @@ function appReducer(state, action) {
       const { userId, messages: newMessages } = action.payload;
       const existing = state.messages[userId] || [];
 
-      // Build lookup set using messageId AND sender+timestamp as fallback
-      // This handles cases where messageId format differs between IndexedDB and server
-      const existingKeys = new Set();
-      existing.forEach(m => {
-        if (m.messageId) existingKeys.add(`id:${m.messageId}`);
-        if (m.timestamp && m.sender) existingKeys.add(`ts:${m.sender}:${m.timestamp}`);
-      });
+      // Normalize timestamp to ms
+      const normTs = (ts) => (!ts ? 0 : ts < 1e12 ? ts * 1000 : ts);
 
-      const filtered = newMessages.filter(m => {
-        if (m.messageId && existingKeys.has(`id:${m.messageId}`)) return false;
-        if (m.timestamp && m.sender && existingKeys.has(`ts:${m.sender}:${m.timestamp}`)) return false;
-        return true;
-      });
+      // Merge all, deduplicate by messageId, sort by timestamp
+      const all = [...existing, ...newMessages];
+      const seen = new Map();
+
+      for (const m of all) {
+        const ts = normTs(m.timestamp);
+        const key = m.messageId || `${m.sender}:${ts}`;
+
+        if (!seen.has(key)) {
+          seen.set(key, { ...m, timestamp: ts });
+        } else {
+          // Keep the version with better status (delivered > not, read > not)
+          const prev = seen.get(key);
+          if ((m.delivered && !prev.delivered) || (m.read && !prev.read)) {
+            seen.set(key, { ...m, timestamp: ts });
+          }
+        }
+      }
+
+      const merged = Array.from(seen.values()).sort((a, b) => a.timestamp - b.timestamp);
 
       return {
         ...state,
-        messages: { ...state.messages, [userId]: [...filtered, ...existing] },
+        messages: { ...state.messages, [userId]: merged },
       };
     }
 

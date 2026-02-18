@@ -68,6 +68,42 @@ export async function initDB() {
 }
 
 /**
+ * Deduplicate messages by messageId or sender+timestamp proximity.
+ * Returns sorted array (oldest first).
+ * @param {Array} messages - Array of message records
+ * @returns {Array} - Deduplicated and sorted array
+ */
+function deduplicateMessages(messages) {
+  const seen = new Map();
+
+  for (const m of messages) {
+    // Primary key: messageId
+    if (m.messageId) {
+      if (!seen.has(m.messageId)) {
+        seen.set(m.messageId, m);
+      }
+      continue;
+    }
+
+    // Fallback: sender + timestamp (within 2s window)
+    const senderKey = m.senderId || m.sender || 'unknown';
+    let isDup = false;
+    for (const [, existing] of seen) {
+      const existingSender = existing.senderId || existing.sender || 'unknown';
+      if (existingSender === senderKey && Math.abs(existing.timestamp - m.timestamp) < 2000) {
+        isDup = true;
+        break;
+      }
+    }
+    if (!isDup) {
+      seen.set(`noid-${m.timestamp}-${senderKey}`, m);
+    }
+  }
+
+  return Array.from(seen.values()).sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/**
  * Save a message to IndexedDB
  * @param {Object} message - Message object
  * @returns {Promise<void>}
@@ -80,15 +116,13 @@ export async function saveMessage(message) {
     const request = store.add(message);
 
     request.onsuccess = () => {
-      console.log('🗄️ IndexedDB - DEBUG: Message saved with ID:', request.result);
-      // Clean up old messages (keep only last 50 per friend)
       cleanupOldMessages(message.friendId).catch(err =>
         console.warn('🗄️ IndexedDB - Cleanup warning:', err)
       );
       resolve();
     };
     request.onerror = () => {
-      console.error('🗄️ IndexedDB - DEBUG: Save failed:', request.error);
+      console.error('🗄️ IndexedDB - Save failed:', request.error);
       reject(request.error);
     };
   });
@@ -177,7 +211,41 @@ async function cleanupOldMessages(friendId) {
 }
 
 /**
- * Load all messages for a specific friend
+ * Update a message in IndexedDB by its messageId.
+ * Used to set server timestamp and delivered status after delivery confirmation.
+ * @param {string} messageId - The message's unique ID
+ * @param {Object} updates - Fields to update (e.g., { timestamp, delivered })
+ * @returns {Promise<boolean>} - Whether the message was found and updated
+ */
+export async function updateMessageByMessageId(messageId, updates) {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.MESSAGES], 'readwrite');
+    const store = transaction.objectStore(STORES.MESSAGES);
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const messages = request.result || [];
+      const target = messages.find(m => m.messageId === messageId);
+
+      if (!target) {
+        resolve(false);
+        return;
+      }
+
+      // Merge updates into the record
+      const updated = { ...target, ...updates };
+      const putRequest = store.put(updated);
+
+      putRequest.onsuccess = () => resolve(true);
+      putRequest.onerror = () => reject(putRequest.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Load all messages for a specific friend (deduplicated)
  * @param {string} friendId - Friend's user ID
  * @returns {Promise<Array>}
  */
@@ -189,7 +257,10 @@ export async function loadMessagesByFriend(friendId) {
     const index = store.index('friendId');
     const request = index.getAll(friendId);
 
-    request.onsuccess = () => resolve(request.result || []);
+    request.onsuccess = () => {
+      const messages = request.result || [];
+      resolve(deduplicateMessages(messages));
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -208,7 +279,6 @@ export async function loadAllMessages() {
     request.onsuccess = () => {
       const messages = request.result || [];
       console.log('🗄️ IndexedDB - DEBUG: Raw messages from DB:', messages.length, 'messages');
-      console.log('🗄️ IndexedDB - DEBUG: First message:', messages[0]);
 
       // Group by friendId
       const grouped = messages.reduce((acc, msg) => {
@@ -217,9 +287,9 @@ export async function loadAllMessages() {
         return acc;
       }, {});
 
-      // Sort each friend's messages by timestamp
+      // Deduplicate and sort each friend's messages
       Object.keys(grouped).forEach(friendId => {
-        grouped[friendId].sort((a, b) => a.timestamp - b.timestamp);
+        grouped[friendId] = deduplicateMessages(grouped[friendId]);
       });
 
       console.log('🗄️ IndexedDB - DEBUG: Grouped messages:', Object.keys(grouped).length, 'conversations');
@@ -322,6 +392,74 @@ export async function loadConversationMetadata() {
         return acc;
       }, {});
       resolve(grouped);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * One-time cleanup: remove duplicate records already in IndexedDB.
+ * Call on app startup to purge duplicates accumulated before dedup was added.
+ * @returns {Promise<number>} - Number of duplicates removed
+ */
+export async function purgeExistingDuplicates() {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORES.MESSAGES], 'readwrite');
+    const store = transaction.objectStore(STORES.MESSAGES);
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const allMessages = request.result || [];
+      if (allMessages.length === 0) { resolve(0); return; }
+
+      // Group by friendId
+      const grouped = {};
+      for (const m of allMessages) {
+        if (!grouped[m.friendId]) grouped[m.friendId] = [];
+        grouped[m.friendId].push(m);
+      }
+
+      // For each group, find duplicates and collect IDs to delete
+      const idsToDelete = [];
+      for (const friendId in grouped) {
+        const msgs = grouped[friendId];
+        const seen = new Map();
+
+        for (const m of msgs) {
+          let key = m.messageId;
+          if (!key) {
+            const sender = m.senderId || m.sender || 'unknown';
+            key = `${sender}:${m.timestamp}`;
+          }
+
+          if (seen.has(key)) {
+            // This is a duplicate — mark for deletion
+            idsToDelete.push(m.id);
+          } else {
+            seen.set(key, m);
+          }
+        }
+      }
+
+      if (idsToDelete.length === 0) {
+        console.log('🗄️ IndexedDB - No duplicates found');
+        resolve(0);
+        return;
+      }
+
+      console.log(`🗄️ IndexedDB - Purging ${idsToDelete.length} duplicate records...`);
+
+      // Delete duplicates
+      const deleteTx = db.transaction([STORES.MESSAGES], 'readwrite');
+      const deleteStore = deleteTx.objectStore(STORES.MESSAGES);
+      idsToDelete.forEach(id => deleteStore.delete(id));
+
+      deleteTx.oncomplete = () => {
+        console.log(`🗄️ IndexedDB - ✅ Purged ${idsToDelete.length} duplicates`);
+        resolve(idsToDelete.length);
+      };
+      deleteTx.onerror = () => reject(deleteTx.error);
     };
     request.onerror = () => reject(request.error);
   });

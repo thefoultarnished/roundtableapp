@@ -132,6 +132,36 @@ export default function ChatArea() {
   // Load blob URLs for all senders ONCE (called only when sender IDs change)
   const senderProfilePictureMap = useProfilePictureMap(uniqueSenderUsers);
 
+  // Track scroll position before loading older messages
+  const previousScrollHeightRef = useRef(0);
+  const wasLoadingOlderRef = useRef(false);
+
+  // Preserve scroll position when loading older messages
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const isCurrentlyLoading = state.loadingOlderMessages?.[state.activeChatUserId];
+    const wasLoading = wasLoadingOlderRef.current;
+
+    if (isCurrentlyLoading && !wasLoading) {
+      // Just started loading - save current scroll height
+      previousScrollHeightRef.current = container.scrollHeight;
+      console.log(`📏 Saved scroll height before loading: ${previousScrollHeightRef.current}px`);
+    } else if (!isCurrentlyLoading && wasLoading) {
+      // Just finished loading - restore scroll position
+      const newScrollHeight = container.scrollHeight;
+      const heightDifference = newScrollHeight - previousScrollHeightRef.current;
+      
+      if (heightDifference > 0) {
+        container.scrollTop += heightDifference;
+        console.log(`📏 Restored scroll position: added ${heightDifference}px to scrollTop`);
+      }
+    }
+
+    wasLoadingOlderRef.current = isCurrentlyLoading;
+  }, [state.loadingOlderMessages, state.activeChatUserId, userMessages.length]);
+
   // Scroll to bottom on new messages or when opening a new chat
   useEffect(() => {
     if (!messagesEndRef.current) return;
@@ -887,6 +917,19 @@ export default function ChatArea() {
             scrollbarColor: 'rgba(6, 182, 212, 0.4) transparent',
           }}
         >
+          {/* Loading indicator for older messages */}
+          {state.loadingOlderMessages?.[state.activeChatUserId] && (
+            <div className="flex justify-center py-3">
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
+                <svg className="animate-spin h-4 w-4 text-cyan-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-xs text-slate-400">Loading older messages...</span>
+              </div>
+            </div>
+          )}
+
           {groupedMessages.length === 0 ? (
             <div className="flex items-center justify-center h-full text-center">
               <div>
