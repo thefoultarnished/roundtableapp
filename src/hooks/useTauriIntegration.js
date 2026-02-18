@@ -50,6 +50,10 @@ export function useTauriIntegration() {
     const savedChatFont = localStorage.getItem('chatFont');
     if (savedAppFont) document.documentElement.style.setProperty('--app-font', savedAppFont);
     if (savedChatFont) document.documentElement.style.setProperty('--chat-font', savedChatFont);
+
+    // Load saved blur radius
+    const savedBlur = localStorage.getItem('glassBlur') || '24';
+    document.documentElement.style.setProperty('--glass-blur', savedBlur + 'px');
   }, []);
 
   // Setup Tauri integration

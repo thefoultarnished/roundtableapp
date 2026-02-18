@@ -13,6 +13,7 @@
   --chat-font: 'Inter', sans-serif;
 
   /* Glass tokens — Light (Premium Mac-like) */
+  --glass-blur: 24px;
   --glass-opacity: 0.75;
   --glass-bg: rgba(255, 255, 255, var(--glass-opacity));
   --glass-bg-heavy: rgba(255, 255, 255, calc(var(--glass-opacity) + 0.1));
@@ -166,8 +167,8 @@ html, body {
 
 .glassmorphism {
   background: var(--glass-bg);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -175,8 +176,8 @@ html, body {
 
 .glass-panel {
   background: var(--glass-bg);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(calc(var(--glass-blur) + 16px)) saturate(180%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 16px)) saturate(180%);
   border: 1px solid var(--glass-border-subtle);
   box-shadow: 
     var(--glass-shadow),
@@ -186,8 +187,8 @@ html, body {
 
 .glass-panel-heavy {
   background: var(--glass-bg-heavy);
-  backdrop-filter: blur(50px) saturate(200%);
-  -webkit-backdrop-filter: blur(50px) saturate(200%);
+  backdrop-filter: blur(calc(var(--glass-blur) + 26px)) saturate(200%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 26px)) saturate(200%);
   border: 1px solid var(--glass-border-subtle);
   box-shadow: 
     var(--glass-shadow-lg),

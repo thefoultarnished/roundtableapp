@@ -24,6 +24,7 @@ export default function SettingsModal() {
   const [windowTransparency, setWindowTransparency] = useState(true);
   const [transparencyLevel, setTransparencyLevel] = useState(0.75); // UI Glass
   const [windowOpacity, setWindowOpacity] = useState(0.70); // Main Background
+  const [glassBlur, setGlassBlur] = useState(24); // Blur radius in px
   const [publicKeyJwk, setPublicKeyJwk] = useState(null);
   const [privateKeyJwk, setPrivateKeyJwk] = useState(null);
 
@@ -48,6 +49,7 @@ export default function SettingsModal() {
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
       setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
+      setGlassBlur(parseInt(localStorage.getItem('glassBlur') || '24'));
 
       // Load crypto keys for testing (use same source and naming as useOnlineMode)
       try {
@@ -226,6 +228,7 @@ export default function SettingsModal() {
     localStorage.setItem('windowTransparency', windowTransparency);
     localStorage.setItem('transparencyLevel', transparencyLevel);
     localStorage.setItem('windowOpacity', windowOpacity);
+    localStorage.setItem('glassBlur', glassBlur);
     localStorage.setItem('theme', theme);
 
     // Update AppContext currentUser
@@ -239,6 +242,7 @@ export default function SettingsModal() {
     document.documentElement.style.setProperty('--chat-font', chatFont);
     document.documentElement.style.setProperty('--font-size-scale', fontScale / 100);
     document.documentElement.style.setProperty('--glass-opacity', transparencyLevel);
+    document.documentElement.style.setProperty('--glass-blur', glassBlur + 'px');
 
     // Apply Theme Classes
     document.documentElement.classList.remove('dark', 'aurora');
@@ -295,10 +299,7 @@ export default function SettingsModal() {
       }
     }
 
-    // Show save status
-    setSaveStatus('Saved!');
-    const timer = setTimeout(() => setSaveStatus(''), 1500);
-    return () => clearTimeout(timer);
+    closeSettings();
   };
 
   if (!state.settingsOpen) return null;
@@ -352,16 +353,30 @@ export default function SettingsModal() {
       if (e.target === e.currentTarget) closeSettings();
     }}>
       <div className="glass-panel-heavy rounded-3xl w-full max-w-2xl flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+
         {/* Header */}
-        <div className="py-3 px-5 border-b border-white/20 dark:border-white/20 flex justify-between items-center">
+        <div className="py-3 px-5 border-b border-white/20 flex justify-between items-center flex-shrink-0">
           <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-3">
             <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-sm shadow-lg shadow-teal-500/20">⚙</span>
             <span>Settings</span>
-            <span className="text-[9px] text-teal-500 font-bold uppercase tracking-widest ml-4 h-3 animate-pulse self-center mt-1">
-              {saveStatus}
-            </span>
+            <span className="text-[9px] text-teal-500 font-bold uppercase tracking-widest ml-2 animate-pulse">{saveStatus}</span>
           </h2>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {/* Logout */}
+            <button
+              onClick={() => {
+                if (online?.sendLogout) online.sendLogout();
+                dispatch({ type: 'LOGOUT' });
+                closeSettings();
+              }}
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-orange-500/30 text-orange-500 hover:bg-orange-500/20 hover:border-orange-500/50 transition-all duration-300 hover:scale-110"
+              title="Logout"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+            {/* Save */}
             <button
               onClick={handleSave}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-green-500/30 text-green-500 hover:bg-green-500/20 hover:border-green-500/50 transition-all duration-300 hover:scale-110"
@@ -371,9 +386,11 @@ export default function SettingsModal() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </button>
+            {/* Close */}
             <button
               onClick={closeSettings}
               className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 hover:border-red-500/50 transition-all duration-300 hover:rotate-90"
+              title="Close"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -383,13 +400,15 @@ export default function SettingsModal() {
         </div>
 
         {/* Body */}
-        <div className="px-5 pt-4 pb-10 grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="px-5 pt-4 pb-5 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-y-auto">
+
           {/* Column 1: Profile */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <SectionHeader color="teal" label="Profile" />
-            <div className="flex flex-col items-center p-4 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
-              <div className="relative group mb-3">
-                <div className={`w-20 h-20 rounded-full overflow-hidden ring-3 ring-white/20 group-hover:ring-teal-400/40 transition-all duration-400 shadow-lg ${uploadingPicture ? 'opacity-50' : ''}`}>
+            {/* Avatar + fields in one row */}
+            <div className="flex gap-3 items-center p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
+              <div className="relative flex-shrink-0 group">
+                <div className={`w-16 h-16 rounded-full overflow-hidden ring-2 ring-white/20 group-hover:ring-teal-400/40 transition-all duration-300 shadow-lg ${uploadingPicture ? 'opacity-50' : ''}`}>
                   <img
                     src={profilePicture || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>'}
                     className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 object-cover"
@@ -398,40 +417,43 @@ export default function SettingsModal() {
                 </div>
                 {uploadingPicture && (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={() => document.getElementById('pfp-file-input')?.click()}
                   disabled={uploadingPicture}
-                  className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white shadow-lg shadow-teal-500/30 border-2 border-white dark:border-slate-900 hover:scale-110 transition-transform duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  className="absolute -bottom-1 -right-1 p-1 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-white shadow-lg shadow-teal-500/30 border-2 border-white dark:border-slate-900 hover:scale-110 transition-transform duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </button>
                 <input type="file" id="pfp-file-input" className="hidden" accept="image/png, image/jpeg, image/webp" onChange={handlePfpChange} disabled={uploadingPicture} />
               </div>
-              {uploadError && (
-                <p className="text-[9px] text-red-500 text-center mt-2 font-medium">{uploadError}</p>
-              )}
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className={labelClass}>Display Name</label>
-                <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} placeholder="Name" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} placeholder="Display Name" />
+                <input type="text" value={username} disabled className={inputClass + " opacity-50 cursor-not-allowed"} placeholder="Username" />
+                {uploadError && <p className="text-[9px] text-red-500 font-medium">{uploadError}</p>}
               </div>
-              <div>
-                <label className={labelClass}>Username (@) <span className="text-[8px] text-slate-500 font-normal">Cannot be changed</span></label>
-                <input type="text" value={username} disabled className={inputClass + " opacity-60 cursor-not-allowed"} placeholder="Unique ID" />
+            </div>
+            {/* Keys */}
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-2">
+              <label className={labelClass}>Public Key</label>
+              <div className="max-h-16 overflow-y-auto bg-black/20 rounded-xl p-2 text-[8px] font-mono text-cyan-300 break-all">
+                {publicKeyJwk ? JSON.stringify(publicKeyJwk, null, 2) : 'No public key found'}
+              </div>
+              <label className={labelClass}>Private Key</label>
+              <div className="max-h-16 overflow-y-auto bg-black/20 rounded-xl p-2 text-[8px] font-mono text-purple-300 break-all">
+                {privateKeyJwk ? JSON.stringify(privateKeyJwk, null, 2) : 'No private key found'}
               </div>
             </div>
           </div>
 
           {/* Column 2: Appearance */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <SectionHeader color="purple" label="Appearance" />
             <div className="space-y-3 p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div>
@@ -474,75 +496,58 @@ export default function SettingsModal() {
                   ]}
                 />
               </div>
-            </div>
-            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
-              <div className="flex justify-between items-center mb-2">
-                <label className={labelClass + ' mb-0'}>Scale</label>
-                <span className="text-[10px] font-bold font-mono text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-lg">{fontScale}%</span>
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className={labelClass + ' mb-0'}>Font Scale</label>
+                  <span className="text-[10px] font-bold font-mono text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded-full">{fontScale}%</span>
+                </div>
+                <input type="range" min="50" max="200" step="10" value={fontScale} onChange={(e) => setFontScale(e.target.value)}
+                  className="w-full h-1.5 rounded-full appearance-none bg-white/20 dark:bg-white/10 accent-purple-500 cursor-pointer" />
               </div>
-              <input type="range" min="50" max="200" step="10" value={fontScale} onChange={(e) => setFontScale(e.target.value)}
-                className="w-full h-1.5 rounded-lg appearance-none bg-white/20 dark:bg-white/10 accent-purple-500 cursor-pointer" />
             </div>
-            
-            {/* Window Transparency Toggle */}
-            {/* Window Transparency Toggle */}
-             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3 mb-10">
+            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className={labelClass + ' mb-0'}>Transparency</span>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={windowTransparency} 
-                    onChange={(e) => setWindowTransparency(e.target.checked)} 
-                    className="sr-only peer" 
-                  />
+                  <input type="checkbox" checked={windowTransparency} onChange={(e) => setWindowTransparency(e.target.checked)} className="sr-only peer" />
                   <div className="w-9 h-5 bg-white/20 dark:bg-white/10 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-purple-500 peer-checked:to-indigo-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 after:shadow-lg" />
                 </label>
               </div>
-
-              {/* Transparency Level Slider */}
-              {windowTransparency && (
-                <div className="animate-fade-in-down space-y-3">
-                  {/* UI Glass Opacity */}
-                  <div>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <label className="text-[9px] text-slate-400 font-medium">UI Glass Opacity</label>
-                      <span className="text-[9px] font-mono text-slate-500">{Math.round(transparencyLevel * 100)}%</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="10" 
-                      max="100" 
-                      step="5" 
-                      value={transparencyLevel * 100} 
-                      onChange={(e) => setTransparencyLevel(e.target.value / 100)}
-                      className="w-full h-1.5 rounded-lg appearance-none bg-white/20 dark:bg-white/10 accent-indigo-500 cursor-pointer" 
-                    />
+              <div className={`space-y-3 transition-all duration-300 overflow-hidden ${windowTransparency ? 'opacity-100 max-h-56' : 'opacity-0 max-h-0'}`}>
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-[9px] text-slate-400 font-medium">UI Glass</label>
+                    <span className="text-[9px] font-mono text-slate-500">{Math.round(transparencyLevel * 100)}%</span>
                   </div>
-                  
-                  {/* Background Opacity */}
-                  <div>
-                   <div className="flex justify-between items-center mb-1.5">
-                      <label className="text-[9px] text-slate-400 font-medium">Win. Background Opacity</label>
-                      <span className="text-[9px] font-mono text-slate-500">{Math.round(windowOpacity * 100)}%</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="0" 
-                      max="100" 
-                      step="5" 
-                      value={windowOpacity * 100} 
-                      onChange={(e) => setWindowOpacity(e.target.value / 100)}
-                      className="w-full h-1.5 rounded-lg appearance-none bg-white/20 dark:bg-white/10 accent-teal-500 cursor-pointer" 
-                    />
-                  </div>
+                  <input type="range" min="10" max="100" step="5" value={transparencyLevel * 100} onChange={(e) => setTransparencyLevel(e.target.value / 100)}
+                    className="w-full h-1.5 rounded-full appearance-none bg-white/20 dark:bg-white/10 accent-indigo-500 cursor-pointer" />
                 </div>
-              )}
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-[9px] text-slate-400 font-medium">Background</label>
+                    <span className="text-[9px] font-mono text-slate-500">{Math.round(windowOpacity * 100)}%</span>
+                  </div>
+                  <input type="range" min="0" max="100" step="5" value={windowOpacity * 100} onChange={(e) => setWindowOpacity(e.target.value / 100)}
+                    className="w-full h-1.5 rounded-full appearance-none bg-white/20 dark:bg-white/10 accent-teal-500 cursor-pointer" />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="text-[9px] text-slate-400 font-medium">Blur Radius</label>
+                    <span className="text-[9px] font-mono text-slate-500">{glassBlur}px</span>
+                  </div>
+                  <input type="range" min="0" max="40" step="2" value={glassBlur} onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setGlassBlur(val);
+                    document.documentElement.style.setProperty('--glass-blur', val + 'px');
+                  }}
+                    className="w-full h-1.5 rounded-full appearance-none bg-white/20 dark:bg-white/10 accent-cyan-500 cursor-pointer" />
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Column 3: Network */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <SectionHeader color="blue" label="Network" />
             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <label className={labelClass}>Connection Mode</label>
@@ -550,48 +555,16 @@ export default function SettingsModal() {
             </div>
             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
               <div className="flex items-center justify-between">
-                <span className={labelClass + ' mb-0'}>Auto-Download</span>
+                <span className={labelClass + ' mb-0'}>Auto-Download Files</span>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={autoDownload} onChange={(e) => setAutoDownload(e.target.checked)} className="sr-only peer" />
                   <div className="w-9 h-5 bg-white/20 dark:bg-white/10 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-teal-400 peer-checked:to-cyan-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 after:shadow-lg" />
                 </label>
               </div>
             </div>
-
-            {/* Public Key Display */}
-            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
-              <label className={labelClass}>Public Key (Test)</label>
-              <div className="max-h-24 overflow-y-auto bg-black/20 rounded-lg p-2 text-[8px] font-mono text-cyan-300 break-all">
-                {publicKeyJwk ? JSON.stringify(publicKeyJwk, null, 2) : 'No public key found'}
-              </div>
-            </div>
-
-            {/* Private Key Display */}
-            <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm">
-              <label className={labelClass}>Private Key (Test)</label>
-              <div className="max-h-24 overflow-y-auto bg-black/20 rounded-lg p-2 text-[8px] font-mono text-purple-300 break-all">
-                {privateKeyJwk ? JSON.stringify(privateKeyJwk, null, 2) : 'No private key found'}
-              </div>
-            </div>
-
-            {/* Logout Button */}
-            <button
-              onClick={() => {
-                // Tell server to disconnect this user first
-                if (online?.sendLogout) {
-                  online.sendLogout();
-                }
-                // Then clear local state
-                dispatch({ type: 'LOGOUT' });
-                closeSettings();
-              }}
-              className="w-full px-4 py-2.5 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold text-sm hover:shadow-lg hover:shadow-red-500/30 transition-all duration-300 hover:scale-105 active:scale-95 mt-2"
-            >
-              Logout
-            </button>
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   );

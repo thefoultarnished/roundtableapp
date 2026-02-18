@@ -83,6 +83,9 @@ function AppContent() {
       {/* Splash Screen Overlay */}
       <SplashScreen isVisible={splashVisible} />
 
+      {/* Full-screen backdrop blur — blurs OS desktop visible through transparent window */}
+      <div className="fixed inset-0 pointer-events-none" style={{ backdropFilter: 'blur(var(--glass-blur))', WebkitBackdropFilter: 'blur(var(--glass-blur))', zIndex: 0 }} />
+
       {/* Animated background layers */}
       <AuroraBackground />
       <Particles />
