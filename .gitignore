@@ -1,3 +1,5 @@
+screenshot/
+screenshots/
 node_modules
 dist
 .env
@@ -7,6 +9,7 @@ Thumbs.db
 # Tauri/Rust
 src-tauri/target
 src-tauri/gen/
-.gemini/theme_improvements.md
-.gemini/light_mode_fixes.md
+.gemini/
+.claude/
+Icons/
 implementation_plan.md
