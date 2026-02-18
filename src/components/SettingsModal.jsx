@@ -364,13 +364,16 @@ export default function SettingsModal() {
           <div className="flex gap-2">
             <button
               onClick={handleSave}
-              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-xs font-bold transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/30"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-green-500/30 text-green-500 hover:bg-green-500/20 hover:border-green-500/50 transition-all duration-300 hover:scale-110"
+              title="Save"
             >
-              Save
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
             </button>
             <button
               onClick={closeSettings}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-white/20 text-slate-600 dark:text-slate-400 hover:bg-white/20 hover:text-red-500 dark:hover:text-red-400 hover:border-red-500/30 transition-all duration-300 hover:rotate-90 group"
+              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 hover:border-red-500/50 transition-all duration-300 hover:rotate-90"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -627,23 +630,23 @@ function ConnectionModeToggle() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative bg-white/10 dark:bg-white/5 p-1 rounded-xl flex border border-white/10 h-10">
+      <div className="relative bg-white/10 dark:bg-white/5 p-1 rounded-full flex border border-white/10 h-10">
         {/* Sliding Background */}
-        <div 
-            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg shadow-sm transition-all duration-300 z-0 backdrop-blur-md border border-white/10 ${mode === 'online' ? 'left-[calc(50%)] bg-purple-500/20' : 'left-1 bg-teal-500/20'}`}
+        <div
+            className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full shadow-sm transition-all duration-300 z-0 backdrop-blur-md border border-white/10 ${mode === 'online' ? 'left-[calc(50%)] bg-purple-500/20' : 'left-1 bg-teal-500/20'}`}
         />
         
         <button 
             type="button" 
             onClick={() => setMode('lan')}
-            className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'lan' ? 'text-teal-400' : 'text-slate-400'}`}
+            className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-full ${mode === 'lan' ? 'text-teal-400' : 'text-slate-400'}`}
         >
           LAN
         </button>
-        <button 
-            type="button" 
+        <button
+            type="button"
             onClick={() => setMode('online')}
-            className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-lg ${mode === 'online' ? 'text-purple-400' : 'text-slate-400'}`}
+            className={`flex-1 text-[10px] font-bold z-10 transition-colors outline-none rounded-full ${mode === 'online' ? 'text-purple-400' : 'text-slate-400'}`}
         >
           ONLINE
         </button>
@@ -654,18 +657,16 @@ function ConnectionModeToggle() {
       </p>
 
       {/* Server URL Input (Only for Online Mode) */}
-      {mode === 'online' && (
-        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-            <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Relay Server URL</label>
-            <input 
-                type="text" 
-                value={serverUrl} 
-                onChange={(e) => setServerUrl(e.target.value)}
-                placeholder="ws://123.45.67.89:8080"
-                className="w-full px-3 py-2 text-[10px] font-mono rounded-lg bg-black/20 border border-white/10 text-slate-300 placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-purple-500/50 transition-all"
-            />
-        </div>
-      )}
+      <div className={`transition-all duration-300 overflow-hidden ${mode === 'online' ? 'opacity-100 max-h-20' : 'opacity-0 max-h-0'}`}>
+          <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Relay Server URL</label>
+          <input
+              type="text"
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              placeholder="ws://123.45.67.89:8080"
+              className="w-full px-3 py-2 text-[10px] font-mono rounded-lg bg-black/20 border border-white/10 text-slate-300 placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-purple-500/50 transition-all"
+          />
+      </div>
     </div>
   );
 }

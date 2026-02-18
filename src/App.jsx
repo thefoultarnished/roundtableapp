@@ -63,6 +63,10 @@ function AppContent() {
   };
 
   React.useEffect(() => {
+    // Show the window now that React has rendered (avoids transparent rectangle flash)
+    if (window.__TAURI__?.window) {
+      window.__TAURI__.window.getCurrentWindow().show();
+    }
     updateBackground();
     // Listen for storage changes (settings updates)
     window.addEventListener('storage', updateBackground);
