@@ -15,9 +15,11 @@ export async function applyAcrylicEffect(enable, tint) {
   try {
     const win = window.__TAURI__.window.getCurrentWindow();
     if (enable) {
-      // tint is 0-100; map to color.a 0-200 (0 = fully clear blur, 200 = heavily tinted)
+      // tint is 0-100; map to color.a 0-255
       const tintVal = tint !== undefined ? tint : parseInt(localStorage.getItem('acrylicTint') || '20');
-      const alpha = Math.round((tintVal / 100) * 200);
+      const alpha = Math.round((tintVal / 100) * 255);
+      // Must clear first — setEffects won't update color on an already-active effect
+      await win.clearEffects();
       await win.setEffects({ effects: ['acrylic'], state: 'active', color: [0, 0, 0, alpha] });
     } else {
       await win.clearEffects();

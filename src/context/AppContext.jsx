@@ -566,11 +566,13 @@ export function AppProvider({ children }) {
           console.log(`🔑 CLAUDE: Peer keys available = ${Object.keys(peerKeys).length}`);
           console.log(`🔑 CLAUDE: ===== INDEXEDDB DECRYPTION END =====`);
 
-          const mergedMessages = decryptedMessages;
-          dispatch({
-            type: 'SET_MESSAGES',
-            payload: mergedMessages
-          });
+          // Use PREPEND_MESSAGES per-user so we merge with existing state instead of
+          // replacing it — avoids the blink caused by SET_MESSAGES wiping in-memory messages.
+          for (const [userId, messages] of Object.entries(decryptedMessages)) {
+            if (messages.length > 0) {
+              dispatch({ type: 'PREPEND_MESSAGES', payload: { userId, messages } });
+            }
+          }
         }
 
         // Load friends
