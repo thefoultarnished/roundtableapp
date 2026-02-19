@@ -176,6 +176,17 @@ function appReducer(state, action) {
     case 'SET_DISPLAYED_USERS':
       return { ...state, displayedUsers: action.payload };
 
+    // Merges cached friends from IndexedDB into state without overwriting
+    // live-discovered users or status. Safe to call any time.
+    case 'SEED_FRIENDS_FROM_CACHE': {
+      const { users, friendIds } = action.payload;
+      const existingIds = new Set(state.allUsers.map(u => String(u.id)));
+      const toAdd = users.filter(u => u.id && !existingIds.has(String(u.id)));
+      const merged = toAdd.length ? [...state.allUsers, ...toAdd] : state.allUsers;
+      const mergedFriendIds = Array.from(new Set([...state.friends, ...friendIds]));
+      return { ...state, allUsers: merged, displayedUsers: merged, friends: mergedFriendIds };
+    }
+
     case 'SET_ACTIVE_CHAT':
       return { ...state, activeChatUserId: action.payload };
 
@@ -407,141 +418,82 @@ export function AppProvider({ children }) {
       return;
     }
       try {
-        console.log('🗄️ IndexedDB - Loading cached data...');
-
         // Get credentials for decryption
         const username = localStorage.getItem('username');
         const password = localStorage.getItem('authPassword');
 
-        // Load messages (encrypted)
-        const cachedMessages = await loadAllMessages();
-        console.log('🗄️ IndexedDB - DEBUG: loadAllMessages returned:', cachedMessages);
-        console.log('🗄️ IndexedDB - DEBUG: Number of conversations:', Object.keys(cachedMessages).length);
-        console.log('🗄️ IndexedDB - DEBUG: username:', username, 'password:', password ? 'exists' : 'missing');
-
-        // Only decrypt if user is properly logged in (not default username)
+        // Only decrypt if user is properly logged in
         if (!username || username === 'RoundtableUser' || username === 'Anonymous') {
-          console.error(`❌ CLAUDE: CANNOT DECRYPT INDEXEDDB - Invalid/Default Username: "${username}"`);
-          console.error(`❌ CLAUDE: Expected a real username, got: "${username}"`);
-          console.error(`❌ CLAUDE: Action Required: User must login with proper credentials before messages can be decrypted`);
-          console.error(`❌ CLAUDE: Cached messages exist but cannot be accessed without proper user login`);
-          return;
-        }
-
-        if (Object.keys(cachedMessages).length === 0) {
-          console.log(`🔑 CLAUDE: No cached messages to decrypt`);
+          console.warn('🗄️ IndexedDB - skipped decryption: invalid username');
           return;
         }
 
         if (!password) {
-          console.error(`❌ CLAUDE: CANNOT DECRYPT INDEXEDDB - Missing Password`);
-          console.error(`❌ CLAUDE: Username: "${username}"`);
-          console.error(`❌ CLAUDE: Password: ${password ? 'exists' : 'MISSING'}`);
-          console.error(`❌ CLAUDE: Cached messages exist but password is not available for decryption`);
+          console.warn('🗄️ IndexedDB - skipped decryption: password not available');
           return;
         }
 
-        if (username && password) {
-          console.log(`🔑 CLAUDE: ===== INDEXEDDB DECRYPTION START =====`);
-          const totalMessages = Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.length, 0);
-          console.log(`🗄️ IndexedDB - Loaded ${Object.keys(cachedMessages).length} conversations (${totalMessages} messages)`);
-          console.log(`🔑 CLAUDE: username = "${username}"`);
-          console.log(`🔑 CLAUDE: Source = localStorage.getItem('username')`);
-          console.log(`🔑 CLAUDE: password exists = ${!!password}`);
-          console.log(`🗄️ IndexedDB - Starting decryption with username: ${username}`);
+        // Load messages (encrypted)
+        const cachedMessages = await loadAllMessages();
+        if (Object.keys(cachedMessages).length === 0) return;
 
+        const totalMessages = Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.length, 0);
+        console.log(`🗄️ IndexedDB - decrypting ${totalMessages} messages across ${Object.keys(cachedMessages).length} conversations`);
+
+        if (username && password) {
           // Derive keys for decryption
           const keyPair = await deriveKeyPairFromPassword(username, password);
-          console.log(`🗄️ IndexedDB - ✅ Derived key pair for decryption`);
-          console.log(`🔑 CLAUDE: keyPair.privateKey type = ${keyPair.privateKey.type}`);
-          console.log(`🔑 CLAUDE: keyPair.publicKey type = ${keyPair.publicKey.type}`);
 
           // Load peer public keys
           const peerKeysCache = localStorage.getItem('peerPublicKeys');
           const peerKeys = peerKeysCache ? JSON.parse(peerKeysCache) : {};
-          console.log(`🔑 CLAUDE: peerPublicKeys found in localStorage = ${!!peerKeysCache}`);
-          console.log(`🔑 CLAUDE: Number of peer keys available = ${Object.keys(peerKeys).length}`);
-          console.log(`🔑 CLAUDE: Peer IDs: ${Object.keys(peerKeys).join(', ')}`);
-          console.log(`🔑 CLAUDE: Full peerKeys object = ${JSON.stringify(peerKeys)}`);
 
           // Decrypt all messages
           const decryptedMessages = {};
-          let encryptedCount = 0;
           let decryptedCount = 0;
           let failedCount = 0;
 
           for (const [friendId, messages] of Object.entries(cachedMessages)) {
-            console.log(`🗄️ IndexedDB - 🔓 Decrypting ${messages.length} messages for friend: ${friendId}`);
-            console.log(`🗄️ IndexedDB - Available peer keys:`, Object.keys(peerKeys));
             decryptedMessages[friendId] = await Promise.all(
-              messages.map(async (msg, idx) => {
+              messages.map(async (msg) => {
                 try {
                   let text = '';
 
-                  // Check if message is encrypted
                   if (msg.content?.encrypted && msg.content.iv && msg.content.cipher) {
-                    encryptedCount++;
-                    console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION START =====`);
-                    // Decrypt message
                     const senderId = msg.senderId === 'me' ? friendId : msg.senderId;
-                    console.log(`🔑 CLAUDE: friendId = "${friendId}"`);
-                    console.log(`🔑 CLAUDE: msg.senderId = "${msg.senderId}"`);
-                    console.log(`🔑 CLAUDE: Calculated senderId = "${senderId}"`);
-
                     const peerKeyJwk = peerKeys[senderId];
-                    console.log(`🔑 CLAUDE: Looking for peerKeys["${senderId}"]`);
-                    console.log(`🔑 CLAUDE: peerKeyJwk found = ${!!peerKeyJwk}`);
 
                     if (peerKeyJwk) {
                       try {
-                        console.log(`🔑 CLAUDE: peerKeyJwk content = ${JSON.stringify(peerKeyJwk)}`);
-                        console.log(`🔑 CLAUDE: msg.content.iv = ${JSON.stringify(msg.content.iv)}`);
-                        console.log(`🔑 CLAUDE: msg.content.cipher = ${JSON.stringify(msg.content.cipher).substring(0, 100)}...`);
-
                         const peerPublicKey = await importPublicKey(peerKeyJwk);
-                        console.log(`🔑 CLAUDE: peerPublicKey imported successfully, type = ${peerPublicKey.type}`);
-
                         const sharedKey = await deriveSharedKey(keyPair.privateKey, peerPublicKey);
-                        console.log(`🔑 CLAUDE: sharedKey derived successfully, type = ${sharedKey.type}`);
-
                         text = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
                         decryptedCount++;
-                        console.log(`✅ CLAUDE: Decryption SUCCESS for ${senderId}`);
-                        console.log(`🗄️ IndexedDB - ✅ Decrypted message from ${senderId}`);
-                        console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION END (SUCCESS) =====`);
                       } catch (decryptErr) {
-                        console.error(`❌ CLAUDE: Decryption FAILED for ${senderId}:`, decryptErr.message);
-                        console.error(`🔑 CLAUDE: Error details = ${decryptErr.toString()}`);
-                        console.error(`🗄️ IndexedDB - ❌ Decryption failed for ${senderId}:`, decryptErr.message);
+                        console.warn(`🗄️ IndexedDB - decryption failed for ${senderId}:`, decryptErr.message);
                         text = '⚠️ Decryption failed (key mismatch)';
                         failedCount++;
-                        console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION END (FAILED) =====`);
                       }
                     } else {
-                      text = '🔒 Encrypted (Key not available)';
-                      console.warn(`❌ CLAUDE: Missing public key for ${senderId}`);
-                      console.warn(`🔑 CLAUDE: Available peer IDs: ${Object.keys(peerKeys).join(', ')}`);
-                      console.warn(`🗄️ IndexedDB - ❌ Missing public key for ${senderId}. Available: ${Object.keys(peerKeys).join(', ')}`);
+                      text = '🔒 Encrypted (key not available)';
                       failedCount++;
-                      console.log(`🔑 CLAUDE: ===== MESSAGE ${idx + 1} DECRYPTION END (NO KEY) =====`);
                     }
                   } else {
-                    // Plaintext message
                     text = msg.content?.text || '';
                   }
 
                   return {
                     sender: msg.sender || msg.senderId,
-                    text: text,
+                    text,
                     time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     timestamp: msg.timestamp,
                     messageId: msg.messageId,
                     files: [],
                     delivered: msg.delivered || false,
-                    read: msg.read || false
+                    read: msg.read || false,
                   };
                 } catch (err) {
-                  console.error('🗄️ IndexedDB - ❌ Failed to decrypt message:', err);
+                  console.error('🗄️ IndexedDB - failed to process message:', err);
                   failedCount++;
                   return {
                     sender: msg.sender || msg.senderId,
@@ -549,22 +501,14 @@ export function AppProvider({ children }) {
                     time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     timestamp: msg.timestamp,
                     messageId: msg.messageId,
-                    files: []
+                    files: [],
                   };
                 }
               })
             );
           }
 
-          console.log(`🗄️ IndexedDB - ✅ Decryption complete: ${decryptedCount}/${encryptedCount} succeeded, ${failedCount} failed`);
-          console.log(`🔑 CLAUDE: ===== INDEXEDDB DECRYPTION SUMMARY =====`);
-          console.log(`🔑 CLAUDE: Total messages processed = ${encryptedCount + Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.filter(m => !m.content?.encrypted).length, 0)}`);
-          console.log(`🔑 CLAUDE: Encrypted messages = ${encryptedCount}`);
-          console.log(`🔑 CLAUDE: Successfully decrypted = ${decryptedCount}`);
-          console.log(`🔑 CLAUDE: Failed to decrypt = ${failedCount}`);
-          console.log(`🔑 CLAUDE: username used = "${username}"`);
-          console.log(`🔑 CLAUDE: Peer keys available = ${Object.keys(peerKeys).length}`);
-          console.log(`🔑 CLAUDE: ===== INDEXEDDB DECRYPTION END =====`);
+          console.log(`🗄️ IndexedDB - ✅ done: ${decryptedCount} decrypted, ${failedCount} failed`);
 
           // Use PREPEND_MESSAGES per-user so we merge with existing state instead of
           // replacing it — avoids the blink caused by SET_MESSAGES wiping in-memory messages.
@@ -573,13 +517,6 @@ export function AppProvider({ children }) {
               dispatch({ type: 'PREPEND_MESSAGES', payload: { userId, messages } });
             }
           }
-        }
-
-        // Load friends
-        const cachedFriends = await loadAllFriends();
-        if (cachedFriends.length > 0) {
-          console.log(`🗄️ IndexedDB - Loaded ${cachedFriends.length} friends`);
-          dispatch({ type: 'SET_ALL_USERS', payload: cachedFriends });
         }
 
         // Load conversation metadata (unread counts, last message times)
@@ -613,6 +550,41 @@ export function AppProvider({ children }) {
     }
   }, [state.currentUser?.username, loadEncryptedMessages]); // Watch for login
 
+  // Load friends immediately on login — before message decryption starts.
+  // This populates the sidebar with names right away so the UI feels instant.
+  useEffect(() => {
+    if (!state.currentUser?.username) return;
+
+    const seedFriendsEarly = async () => {
+      try {
+        const cached = await loadAllFriends();
+        if (!cached.length) return;
+
+        const users = cached
+          .map(f => ({
+            id: f.id || f.userId,
+            name: f.name || f.displayName,
+            username: f.username,
+            profile_picture: f.profile_picture || f.profilePicture,
+            profile_picture_timestamp: f.profile_picture_timestamp,
+            status: 'offline',
+          }))
+          .filter(u => u.id);
+
+        if (!users.length) return;
+
+        dispatch({
+          type: 'SEED_FRIENDS_FROM_CACHE',
+          payload: { users, friendIds: users.map(u => u.id) },
+        });
+      } catch (err) {
+        console.error('🗄️ Failed to seed friends from cache:', err);
+      }
+    };
+
+    seedFriendsEarly();
+  }, [state.currentUser?.username]); // Fires once per login
+
   // Messages are now saved encrypted in useOnlineMode when they arrive/are sent
   // No need to save from AppContext anymore
 
@@ -628,12 +600,16 @@ export function AppProvider({ children }) {
         if (state.allUsers.length > 0) {
           for (const friend of state.allUsers) {
             await saveFriend({
-              userId: friend.id || friend.username,
+              userId: friend.id || friend.username,    // IDB keyPath — must stay
+              id: friend.id || friend.username,        // normalized
+              name: friend.name,                       // normalized
               username: friend.username,
-              displayName: friend.name,
-              profilePicture: friend.profile_picture,
-              status: friend.status
-            }).catch(() => {}); // Ignore errors
+              displayName: friend.name,                // keep for backwards compat
+              profile_picture: friend.profile_picture, // normalized
+              profilePicture: friend.profile_picture,  // keep for backwards compat
+              profile_picture_timestamp: friend.profile_picture_timestamp,
+              status: friend.status,
+            }).catch(() => {});
           }
         }
       } catch (err) {
