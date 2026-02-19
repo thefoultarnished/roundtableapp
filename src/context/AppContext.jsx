@@ -438,7 +438,6 @@ export function AppProvider({ children }) {
         if (Object.keys(cachedMessages).length === 0) return;
 
         const totalMessages = Object.values(cachedMessages).reduce((sum, msgs) => sum + msgs.length, 0);
-        console.log(`🗄️ IndexedDB - decrypting ${totalMessages} messages across ${Object.keys(cachedMessages).length} conversations`);
 
         if (username && password) {
           // Derive keys for decryption
@@ -470,7 +469,6 @@ export function AppProvider({ children }) {
                         text = await decryptMessage(msg.content.iv, msg.content.cipher, sharedKey);
                         decryptedCount++;
                       } catch (decryptErr) {
-                        console.warn(`🗄️ IndexedDB - decryption failed for ${senderId}:`, decryptErr.message);
                         text = '⚠️ Decryption failed (key mismatch)';
                         failedCount++;
                       }
@@ -508,7 +506,7 @@ export function AppProvider({ children }) {
             );
           }
 
-          console.log(`🗄️ IndexedDB - ✅ done: ${decryptedCount} decrypted, ${failedCount} failed`);
+          console.log(`🗄️ IndexedDB - loaded ${totalMessages} msgs across ${Object.keys(cachedMessages).length} conversations (${decryptedCount} decrypted, ${failedCount} failed)`);
 
           // Use PREPEND_MESSAGES per-user so we merge with existing state instead of
           // replacing it — avoids the blink caused by SET_MESSAGES wiping in-memory messages.

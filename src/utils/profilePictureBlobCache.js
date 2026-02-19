@@ -284,8 +284,6 @@ export async function clearAllProfilePictureBlobsWithRevoke() {
  */
 export async function migrateFromLocalStorage() {
   try {
-    console.log('📸 Starting migration from localStorage to IndexedDB...');
-
     const keys = Object.keys(localStorage);
     const profilePicKeys = keys.filter(key => key.startsWith('profilePic_'));
 

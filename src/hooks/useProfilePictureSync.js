@@ -21,10 +21,10 @@ export function useProfilePictureSync(dispatch, allUsers, isOnline) {
 
     async function runMigration() {
       try {
-        console.log('📸 Running one-time migration from localStorage to IndexedDB...');
         await migrateFromLocalStorage();
         await cleanupOldProfilePictures();
         migrationDone.current = true;
+        console.log('📸 Profile picture storage ready.');
       } catch (error) {
         console.error('📸 Migration failed:', error);
       }

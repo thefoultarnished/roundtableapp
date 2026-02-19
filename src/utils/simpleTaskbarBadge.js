@@ -45,7 +45,6 @@ export async function updateNotificationDot(show) {
     if (!show) {
       // Clear the overlay - no notifications
       await tauriWindow.setOverlayIcon(null);
-      console.log('Notification dot cleared');
     } else {
       // Show red dot - there are unread messages
       const dotImage = createRedDot();

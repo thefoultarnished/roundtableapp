@@ -58,57 +58,28 @@ export default function SettingsModal() {
 
       // Load crypto keys for testing (use same source and naming as useOnlineMode)
       try {
-        console.log('🔑 CLAUDE: ===== KEY LOADING START =====');
         const keyUsername = localStorage.getItem('username'); // MUST match useOnlineMode.js line 87 & 338
-        console.log(`🔑 CLAUDE: keyUsername variable = "${keyUsername}"`);
-        console.log(`🔑 CLAUDE: Source = localStorage.getItem('username')`);
 
         if (keyUsername) {
           const keyStorageKey = `keys_${keyUsername}`; // MUST match useOnlineMode.js storage pattern
-          console.log(`🔑 CLAUDE: keyStorageKey = "${keyStorageKey}"`);
-          console.log(`🔑 CLAUDE: Looking for localStorage["${keyStorageKey}_pub"] and localStorage["${keyStorageKey}_priv"]`);
-
           const pubKeyStr = localStorage.getItem(`${keyStorageKey}_pub`);
           const privKeyStr = localStorage.getItem(`${keyStorageKey}_priv`);
 
-          console.log(`🔑 CLAUDE: pubKeyStr found = ${!!pubKeyStr} (length: ${pubKeyStr?.length || 0} chars)`);
-          console.log(`🔑 CLAUDE: privKeyStr found = ${!!privKeyStr} (length: ${privKeyStr?.length || 0} chars)`);
-
           if (pubKeyStr) {
-            const parsedPub = JSON.parse(pubKeyStr);
-            setPublicKeyJwk(parsedPub);
-            console.log(`✅ CLAUDE: Loaded public key from: ${keyStorageKey}_pub`);
-            console.log(`🔑 CLAUDE: Public Key JWK = ${JSON.stringify(parsedPub)}`);
+            setPublicKeyJwk(JSON.parse(pubKeyStr));
           } else {
-             // Fallback to legacy (for backward compatibility)
              const legacyPub = localStorage.getItem('pubKey');
-             console.log(`🔑 CLAUDE: Legacy pubKey found = ${!!legacyPub}`);
-             if (legacyPub) {
-               const parsedLegacyPub = JSON.parse(legacyPub);
-               setPublicKeyJwk(parsedLegacyPub);
-               console.warn('⚠️ CLAUDE: Loaded public key from legacy pubKey (should re-derive keys)');
-               console.log(`🔑 CLAUDE: Legacy Public Key JWK = ${JSON.stringify(parsedLegacyPub)}`);
-             }
+             if (legacyPub) setPublicKeyJwk(JSON.parse(legacyPub));
           }
           if (privKeyStr) {
-            const parsedPriv = JSON.parse(privKeyStr);
-            setPrivateKeyJwk(parsedPriv);
-            console.log(`✅ CLAUDE: Loaded private key from: ${keyStorageKey}_priv`);
-            console.log(`🔑 CLAUDE: Private Key JWK = ${JSON.stringify(parsedPriv)}`);
+            setPrivateKeyJwk(JSON.parse(privKeyStr));
           } else {
-             // Fallback to legacy
              const legacyPriv = localStorage.getItem('privKey');
-             console.log(`🔑 CLAUDE: Legacy privKey found = ${!!legacyPriv}`);
-             if (legacyPriv) {
-               const parsedLegacyPriv = JSON.parse(legacyPriv);
-               setPrivateKeyJwk(parsedLegacyPriv);
-               console.warn('⚠️ CLAUDE: Loaded private key from legacy privKey (should re-derive keys)');
-               console.log(`🔑 CLAUDE: Legacy Private Key JWK = ${JSON.stringify(parsedLegacyPriv)}`);
-             }
+             if (legacyPriv) setPrivateKeyJwk(JSON.parse(legacyPriv));
           }
+          console.log(`🔑 Keys loaded for ${keyUsername} (pub: ${!!pubKeyStr}, priv: ${!!privKeyStr})`);
         } else {
-          console.warn('⚠️ CLAUDE: No username in localStorage - keys cannot be loaded');
-          console.log('🔑 CLAUDE: Available localStorage keys:', Object.keys(localStorage).filter(k => k.includes('key') || k.includes('username')));
+          console.warn('⚠️ No username found - keys cannot be loaded');
         }
         console.log('🔑 CLAUDE: ===== KEY LOADING END =====');
       } catch (err) {

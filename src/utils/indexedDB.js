@@ -278,7 +278,6 @@ export async function loadAllMessages() {
 
     request.onsuccess = () => {
       const messages = request.result || [];
-      console.log('🗄️ IndexedDB - DEBUG: Raw messages from DB:', messages.length, 'messages');
 
       // Group by friendId
       const grouped = messages.reduce((acc, msg) => {
@@ -292,7 +291,6 @@ export async function loadAllMessages() {
         grouped[friendId] = deduplicateMessages(grouped[friendId]);
       });
 
-      console.log('🗄️ IndexedDB - DEBUG: Grouped messages:', Object.keys(grouped).length, 'conversations');
       resolve(grouped);
     };
     request.onerror = () => {

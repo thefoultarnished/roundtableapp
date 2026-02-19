@@ -9,7 +9,5 @@ Thumbs.db
 # Tauri/Rust
 src-tauri/target
 src-tauri/gen/
-.gemini/
 .claude/
 Icons/
-implementation_plan.md

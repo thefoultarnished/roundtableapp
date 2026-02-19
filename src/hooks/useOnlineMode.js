@@ -85,44 +85,30 @@ export function useOnlineMode(dispatch, getState) {
     // Initialize Keys, Check Connection, and Listen for Changes
     useEffect(() => {
         async function init() {
-            console.log("🔑 CLAUDE: init() function CALLED");
             // Derive deterministic keys from password
             const storedPassword = localStorage.getItem('authPassword');
             const username = localStorage.getItem('username');
             let keys;
 
-            console.log(`🔑 CLAUDE: Checking credentials: username=${username}, password=${storedPassword ? 'exists' : 'null'}`);
-
             if (!storedPassword || !username) {
                 // No login yet - can't initialize keys, but still need to connect to relay
                 console.log("⏸️  No credentials available, skipping key initialization");
-                console.log(`Debug: Username=${username}, Password=${storedPassword ? '***' : 'null'}`);
                 setIsInitialized(true);
                 checkConnection(false); // Connect to relay even without keys
                 return;
             }
 
             try {
-                console.log(`🔑 CLAUDE: ===== INITIAL KEY DERIVATION START =====`);
-                console.log(`🔑 CLAUDE: username variable = "${username}"`);
-                console.log(`🔑 CLAUDE: Source = localStorage.getItem('username')`);
-                console.log(`🔑 Starting key derivation for user: ${username}`);
                 // Derive deterministic keys from username + password
                 keys = await deriveKeyPairFromPassword(username, storedPassword);
-                console.log("✅ Derived deterministic keys from password");
 
                 // Store keys namespaced by username - use ONLY username variable for consistency
                 const pubJwk = await exportKey(keys.publicKey);
                 const privJwk = await exportKey(keys.privateKey);
                 const keyStorageKey = `keys_${username}`;
-                console.log(`🔑 CLAUDE: keyStorageKey = "${keyStorageKey}"`);
-                console.log(`🔑 CLAUDE: Storing to localStorage["${keyStorageKey}_pub"] and localStorage["${keyStorageKey}_priv"]`);
                 localStorage.setItem(`${keyStorageKey}_pub`, JSON.stringify(pubJwk));
                 localStorage.setItem(`${keyStorageKey}_priv`, JSON.stringify(privJwk));
-                console.log(`💾 Stored keys with key: ${keyStorageKey}`);
-                console.log(`🔑 CLAUDE: Public Key JWK = ${JSON.stringify(pubJwk)}`);
-                console.log(`🔑 CLAUDE: Private Key JWK = ${JSON.stringify(privJwk)}`);
-                console.log(`🔑 CLAUDE: ===== INITIAL KEY DERIVATION END =====`);
+                console.log(`🔑 Keys derived & saved for ${username}`);
 
                 // Also update legacy global keys for now (backward compat) but they are dangerous
                 // localStorage.setItem('pubKey', JSON.stringify(pubJwk)); 
@@ -228,7 +214,6 @@ export function useOnlineMode(dispatch, getState) {
     // Identify when both Socket and Keys are ready
     useEffect(() => {
         if (!ws || ws.readyState !== WebSocket.OPEN || !keyPair) {
-            console.log('⏸️  Not ready to identify:', { hasWs: !!ws, wsOpen: ws?.readyState === WebSocket.OPEN, hasKeyPair: !!keyPair });
             return;
         }
 
@@ -302,27 +287,17 @@ export function useOnlineMode(dispatch, getState) {
 
         // If keyPair doesn't exist, derive it from password
         if (!currentKeyPair) {
-            console.log(`⏳ KeyPair not ready, deriving from password for [${myUsername}]...`);
             try {
-                console.log(`🔑 CLAUDE: ===== ON-DEMAND KEY DERIVATION START =====`);
-                console.log(`🔑 CLAUDE: myUsername variable = "${myUsername}"`);
-                console.log(`🔑 CLAUDE: Source = localStorage.getItem('username') || getState().currentUser?.username`);
                 currentKeyPair = await deriveKeyPairFromPassword(myUsername, storedPassword);
                 setKeyPair(currentKeyPair);
-                console.log("✅ Derived keys on-demand for identify");
 
                  // CRITICAL FIX: Persist these keys so they are available on reload/settings
                  const pubJwk = await exportKey(currentKeyPair.publicKey);
                  const privJwk = await exportKey(currentKeyPair.privateKey);
                  const keyStorageKey = `keys_${myUsername}`;
-                 console.log(`🔑 CLAUDE: keyStorageKey = "${keyStorageKey}"`);
-                 console.log(`🔑 CLAUDE: Storing to localStorage["${keyStorageKey}_pub"] and localStorage["${keyStorageKey}_priv"]`);
                  localStorage.setItem(`${keyStorageKey}_pub`, JSON.stringify(pubJwk));
                  localStorage.setItem(`${keyStorageKey}_priv`, JSON.stringify(privJwk));
-                 console.log(`💾 Saved on-demand keys for ${myUsername} to localStorage (key: ${keyStorageKey})`);
-                 console.log(`🔑 CLAUDE: Public Key JWK = ${JSON.stringify(pubJwk)}`);
-                 console.log(`🔑 CLAUDE: Private Key JWK = ${JSON.stringify(privJwk)}`);
-                 console.log(`🔑 CLAUDE: ===== ON-DEMAND KEY DERIVATION END =====`);
+                 console.log(`🔑 Keys derived & saved for ${myUsername}`);
 
             } catch (e) {
                 console.error('❌ Failed to derive keys on-demand:', e);
