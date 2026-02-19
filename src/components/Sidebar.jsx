@@ -2,6 +2,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useProfilePictureBlobUrl } from '../hooks/useProfilePictureBlobUrl';
 
+// Manual maximize state — avoids win.maximize() which triggers DWM caption button injection on Windows 11
+const _winMaxState = { active: false, size: null, pos: null };
+
 export default function Sidebar() {
   const { state, dispatch, online } = useAppContext();
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,81 +99,58 @@ export default function Sidebar() {
       style={{ height: 'calc(100vh - calc(var(--layout-spacing) * 2))', marginLeft: 'var(--layout-spacing)', marginTop: 'var(--layout-spacing)', marginBottom: 'var(--layout-spacing)' }}
     >
       {/* Logo & Status Header */}
-      <div className="pt-2 pb-2 px-4 flex items-center justify-between" data-tauri-drag-region>
-        {/* Left: Window Controls + Toggle */}
-        <div className="flex items-center gap-3">
-          {/* Window Controls */}
-          <div className="flex gap-2 group/controls" data-tauri-drag-region>
-            <button className="w-3.5 h-3.5 rounded-full bg-[#FF5F57] hover:bg-[#FF5F57] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={() => window.__TAURI__?.window?.getCurrentWindow().close()}>
-              <svg className="w-2 h-2 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-            <button className="w-3.5 h-3.5 rounded-full bg-[#FEBC2E] hover:bg-[#FEBC2E] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={() => window.__TAURI__?.window?.getCurrentWindow().minimize()}>
-              <svg className="w-2 h-2 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
-            <button className="w-3.5 h-3.5 rounded-full bg-[#28C840] hover:bg-[#28C840] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={async () => {
-                 if (window.__TAURI__?.window) {
-                   const win = window.__TAURI__.window.getCurrentWindow();
-                   const max = await win.isMaximized();
-                   max ? win.unmaximize() : win.maximize();
-                 }
-            }}>
-              <svg className="w-1.5 h-1.5 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <polyline points="9 21 3 21 3 15"></polyline>
-                <line x1="21" y1="3" x2="14" y2="10"></line>
-                <line x1="3" y1="21" x2="10" y2="14"></line>
-              </svg>
-            </button>
-          </div>
-
-          {/* Theme Toggle */}
-          <label className="hidden relative inline-flex items-center cursor-pointer group modern-toggle scale-75 ml-1" title="Toggle Theme">
-            <input
-              type="checkbox"
-              className="sr-only peer"
-              onChange={(e) => {
-                if (e.target.checked) {
-                  document.documentElement.classList.add('dark');
-                  localStorage.setItem('theme', 'dark');
+      <div className="pt-2 pb-2 px-4 flex items-center gap-3" data-tauri-drag-region>
+        {/* Window Controls */}
+        <div className="flex gap-2 group/controls flex-shrink-0" data-tauri-drag-region>
+          <button className="w-3.5 h-3.5 rounded-full bg-[#FF5F57] hover:bg-[#FF5F57] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={() => window.__TAURI__?.window?.getCurrentWindow().close()}>
+            <svg className="w-2 h-2 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <button className="w-3.5 h-3.5 rounded-full bg-[#FEBC2E] hover:bg-[#FEBC2E] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={() => window.__TAURI__?.window?.getCurrentWindow().minimize()}>
+            <svg className="w-2 h-2 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+          <button className="w-3.5 h-3.5 rounded-full bg-[#28C840] hover:bg-[#28C840] border border-black/10 flex items-center justify-center transition-all shadow-sm active:scale-95" onClick={async () => {
+               if (window.__TAURI__?.window) {
+                 const win = window.__TAURI__.window.getCurrentWindow();
+                 const { PhysicalSize, PhysicalPosition } = window.__TAURI__.window;
+                if (_winMaxState.active) {
+                  if (_winMaxState.size && _winMaxState.pos) {
+                    await win.setSize(new PhysicalSize(_winMaxState.size.width, _winMaxState.size.height));
+                    await win.setPosition(new PhysicalPosition(_winMaxState.pos.x, _winMaxState.pos.y));
+                  }
+                  _winMaxState.active = false;
                 } else {
-                  document.documentElement.classList.remove('dark');
-                  localStorage.setItem('theme', 'light');
+                  _winMaxState.size = await win.outerSize();
+                  _winMaxState.pos = await win.outerPosition();
+                  const sf = window.devicePixelRatio || 1;
+                  await win.setPosition(new PhysicalPosition(Math.round(window.screen.availLeft * sf), Math.round(window.screen.availTop * sf)));
+                  await win.setSize(new PhysicalSize(Math.round(window.screen.availWidth * sf), Math.round(window.screen.availHeight * sf)));
+                  _winMaxState.active = true;
                 }
-              }}
-              defaultChecked={document.documentElement.classList.contains('dark')}
-            />
-            <div className="toggle-track w-[32px] h-[16px] bg-gradient-to-br from-amber-100 to-orange-200 dark:from-indigo-800 dark:to-slate-900 rounded-full peer-focus:outline-none transition-all duration-500 ease-out shadow-inner border border-white/30 dark:border-white/10">
-              <div className="toggle-thumb absolute top-[1.5px] left-[1.5px] bg-gradient-to-br from-amber-400 to-orange-400 dark:from-indigo-400 dark:to-blue-500 rounded-full h-[13px] w-[13px] flex items-center justify-center transition-all duration-500 ease-out shadow-lg peer-checked:translate-x-[16px]">
-                <svg className="sun-icon h-[7px] w-[7px] text-white transition-all duration-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                </svg>
-                <svg className="moon-icon absolute h-[7px] w-[7px] text-white transition-all duration-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              </div>
-            </div>
-          </label>
+               }
+          }}>
+            <svg className="w-1.5 h-1.5 text-black/60 opacity-0 group-hover/controls:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <polyline points="9 21 3 21 3 15"></polyline>
+              <line x1="21" y1="3" x2="14" y2="10"></line>
+              <line x1="3" y1="21" x2="10" y2="14"></line>
+            </svg>
+          </button>
         </div>
 
-        {/* Right: Logo */}
-        <div className="flex flex-col items-end" data-tauri-drag-region>
-          <h1 className="non-scalable text-lg font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
-            Roundtable
-          </h1>
-          <div className="hidden flex items-center gap-2 text-[10px] font-medium text-slate-500 dark:text-slate-400">
-             <span>Connected</span>
-          </div>
-        </div>
+        {/* Logo — grouped with controls */}
+        <h1 className="non-scalable text-lg font-bold bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight" data-tauri-drag-region>
+          Roundtable
+        </h1>
       </div>
 
-      {/* Search — Glass input */}
-      <div className="px-3 py-2 flex-shrink-0">
-        <div className={`relative transition-all duration-400 ${searchFocused ? '' : ''}`}>
+      {/* Search — Glass input + bell as sibling */}
+      <div className="px-3 py-2 flex-shrink-0 flex items-center gap-2">
+        <div className="relative flex-1">
           <svg className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none transition-colors duration-300 ${searchFocused ? 'text-teal-400' : 'text-slate-400'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
@@ -182,25 +162,25 @@ export default function Sidebar() {
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setSearchFocused(true)}
             onBlur={() => setSearchFocused(false)}
-            className="w-full pl-10 pr-10 py-2 rounded-app bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/10 focus:border-teal-500/50 outline-none transition-all duration-300 placeholder-slate-400/70 text-sm text-slate-800 dark:text-slate-200 backdrop-blur-sm"
+            className="w-full pl-10 pr-4 py-2 rounded-app bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/10 focus:border-teal-500/50 outline-none transition-all duration-300 placeholder-slate-400/70 text-sm text-slate-800 dark:text-slate-200 backdrop-blur-sm"
           />
-          <button
-            onClick={() => setShowRequests(!showRequests)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all duration-300"
-            title="Friend requests"
-          >
-            <div className="relative">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {pendingRequests.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {pendingRequests.length}
-                </span>
-              )}
-            </div>
-          </button>
         </div>
+
+        {/* Bell — standalone button, clearly separate from the search field */}
+        <button
+          onClick={() => setShowRequests(!showRequests)}
+          className="relative flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-app bg-white/30 dark:bg-white/5 border border-white/30 dark:border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 hover:bg-cyan-500/10 transition-all duration-300"
+          title="Friend requests"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          {pendingRequests.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              {pendingRequests.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* User list */}
@@ -236,13 +216,8 @@ export default function Sidebar() {
             {/* Friends Matches */}
             {friendMatches.length > 0 && (
               <div className="space-y-1">
-                <div className="px-3 py-1 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(217,119,6,0.5)]"></span>
-                  <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Friends</h3>
-                  <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{friendMatches.length}</span>
-                </div>
                 {friendMatches.map((user, index) => (
-                  <UserItem key={user.id} user={user} index={index} isActive={user.id === state.activeChatUserId} unreadCount={state.unreadCounts[user.id] || 0} onClick={() => handleUserClick(user.id)} isFriend={true} />
+                  <UserItem key={user.id} user={user} index={index} isActive={user.id === state.activeChatUserId} unreadCount={state.unreadCounts[user.id] || 0} onClick={() => handleUserClick(user.id)} isFriend={true} lastMessage={state.messages[user.id]?.at(-1)} />
                 ))}
               </div>
             )}
@@ -250,11 +225,6 @@ export default function Sidebar() {
             {/* Users Matches */}
             {userMatches.length > 0 && (
               <div className="space-y-1">
-                <div className="px-3 py-1 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]"></span>
-                  <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Users</h3>
-                  <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{userMatches.length}</span>
-                </div>
                 {userMatches.map((user, index) => (
                   <UserItemWithAddFriend key={user.id} user={user} index={index} currentUsername={currentUsername} onAddFriend={() => addFriend(user.username || user.id)} isPending={sentRequests.includes(user.id) || sentRequests.includes(user.username)} />
                 ))}
@@ -294,7 +264,7 @@ export default function Sidebar() {
             <div className="space-y-1">
               <div className="px-3 py-1 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Online</h3>
+                <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Online</h3>
                 <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{onlineUsers.length}</span>
               </div>
               {onlineUsers.map((user, index) => (
@@ -308,6 +278,7 @@ export default function Sidebar() {
                   isFriend={friends.includes(user.id) || friends.includes(user.username)}
                   isPending={sentRequests.includes(user.id) || sentRequests.includes(user.username)}
                   onAddFriend={() => addFriend(user.username || user.id)}
+                  lastMessage={state.messages[user.id]?.at(-1)}
                 />
               ))}
             </div>
@@ -339,7 +310,7 @@ export default function Sidebar() {
             <div className="space-y-1">
               <div className="px-3 py-1 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-600"></span>
-                <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Offline</h3>
+                <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Offline</h3>
                 <span className="ml-auto text-[10px] font-medium text-slate-400/50 bg-slate-400/10 px-1.5 py-0.5 rounded-md">{offlineUsers.length}</span>
               </div>
               {offlineUsers.map((user, index) => (
@@ -353,6 +324,7 @@ export default function Sidebar() {
                   isFriend={friends.includes(user.id) || friends.includes(user.username)}
                   isPending={sentRequests.includes(user.id) || sentRequests.includes(user.username)}
                   onAddFriend={() => addFriend(user.username || user.id)}
+                  lastMessage={state.messages[user.id]?.at(-1)}
                 />
               ))}
             </div>
@@ -365,7 +337,7 @@ export default function Sidebar() {
       {/* Profile footer — Glass card */}
       <div className="p-3 mt-auto border-t border-white/10 dark:border-white/5">
         {state.currentUser ? (
-          <div className="flex items-center gap-3 p-2 rounded-app bg-white/20 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5 transition-all duration-300 hover:bg-white/30 dark:hover:bg-white/8 group">
+          <div className="flex items-center gap-3 p-2 rounded-item bg-white/20 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5 transition-all duration-300 hover:bg-white/30 dark:hover:bg-white/8 group">
             <div className="relative flex-shrink-0">
               {profilePicture ? (
                 <img src={profilePicture} className="w-10 h-10 rounded-full object-cover shadow-lg ring-2 ring-white/20 group-hover:ring-teal-400/30 transition-all duration-300" alt="Profile" />
@@ -398,7 +370,7 @@ export default function Sidebar() {
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 p-3 rounded-app bg-white/10 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5">
+          <div className="flex items-center gap-2 p-3 rounded-item bg-white/10 dark:bg-white/5 backdrop-blur-sm border border-white/15 dark:border-white/5">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -511,7 +483,7 @@ function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername, isPe
     );
 
   return (
-    <div className="flex items-center p-2.5 rounded-app hover:bg-white/20 dark:hover:bg-white/5 transition-all duration-300 group border border-white/10 hover:border-cyan-400/30">
+    <div className="flex items-center p-2.5 rounded-item hover:bg-white/20 dark:hover:bg-white/5 transition-all duration-300 group border border-white/10 hover:border-cyan-400/30">
       <div className="relative mr-3 flex-shrink-0">
         {avatarHtml}
         <span className={`absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-white dark:border-slate-900 transition-all duration-500 ${
@@ -543,7 +515,28 @@ function UserItemWithAddFriend({ user, index, onAddFriend, currentUsername, isPe
   );
 }
 
-function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPending, onAddFriend }) {
+function formatLastTime(timestamp) {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString())
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  if (now - date < 7 * 86400000)
+    return date.toLocaleDateString([], { weekday: 'short' });
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function getMessagePreview(msg) {
+  if (!msg) return null;
+  if (msg.fileTransfer) return '📎 ' + (msg.fileTransfer.fileName || 'File');
+  if (msg.text) return (msg.sender === 'me' ? 'You: ' : '') + msg.text;
+  return null;
+}
+
+function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPending, onAddFriend, lastMessage }) {
   const { blobUrl } = useProfilePictureBlobUrl(
     user.id || user.username,
     user.profile_picture,
@@ -560,17 +553,18 @@ function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPen
 
   const handleSendRequest = (e) => {
     e.stopPropagation();
-    if (onAddFriend) {
-      onAddFriend();
-    }
+    if (onAddFriend) onAddFriend();
   };
+
+  const preview = getMessagePreview(lastMessage);
+  const timestamp = lastMessage?.timestamp ? formatLastTime(lastMessage.timestamp) : null;
 
   return (
     <div
-      className={`user-item shimmer-hover flex items-center p-2.5 my-0.5 rounded-app cursor-pointer transition-all duration-300 ${
+      className={`user-item shimmer-hover flex items-center p-2.5 my-0.5 rounded-item cursor-pointer transition-all duration-300 border-l-[3px] ${
         isActive
-          ? 'bg-gradient-to-r from-teal-500/15 to-cyan-500/10 dark:from-teal-500/10 dark:to-cyan-500/5 shadow-lg shadow-teal-500/5 border-teal-500/30 backdrop-blur-sm'
-          : 'hover:bg-white/20 dark:hover:bg-white/5'
+          ? 'bg-gradient-to-r from-teal-500/25 to-cyan-500/10 dark:from-teal-500/20 dark:to-cyan-500/5 shadow-lg shadow-teal-500/10 border-l-teal-400 backdrop-blur-sm'
+          : 'hover:bg-white/20 dark:hover:bg-white/5 border-l-transparent'
       }`}
       style={{ animationDelay: `${index * 50}ms` }}
       data-user-id={user.id}
@@ -579,15 +573,31 @@ function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPen
       <div className="relative mr-3 flex-shrink-0">
         {avatarHtml}
         <span className={`absolute -bottom-0.5 -right-0.5 block h-3 w-3 rounded-full border-2 border-white dark:border-slate-900 transition-all duration-500 ${
-          user.status === 'online'
-            ? 'bg-emerald-500 status-online-glow'
-            : 'bg-slate-400 dark:bg-slate-600'
+          user.status === 'online' ? 'bg-emerald-500 status-online-glow' : 'bg-slate-400 dark:bg-slate-600'
         }`} />
       </div>
+
       <div className="flex-grow overflow-hidden min-w-0">
-        <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{user.name}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">@{user.username || 'unknown'}</p>
+        {/* Row 1: name + timestamp */}
+        <div className="flex items-center justify-between gap-1">
+          <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">{user.name}</p>
+          {timestamp && (
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 flex-shrink-0">{timestamp}</span>
+          )}
+        </div>
+        {/* Row 2: message preview + unread badge */}
+        <div className="flex items-center justify-between gap-1 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+            {preview ?? `@${user.username || 'unknown'}`}
+          </p>
+          {unreadCount > 0 && (
+            <div className="unread-badge px-2 py-0.5 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full shadow-lg shadow-red-500/20 min-w-[1.25rem] flex items-center justify-center flex-shrink-0">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </div>
+          )}
+        </div>
       </div>
+
       {!isFriend && isPending && (
         <span className="ml-2 px-2 py-1 rounded-lg text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 flex-shrink-0">
           Pending
@@ -603,11 +613,6 @@ function UserItem({ user, index, isActive, unreadCount, onClick, isFriend, isPen
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
         </button>
-      )}
-      {unreadCount > 0 && (
-        <div className="unread-badge ml-auto px-2.5 py-0.5 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[10px] font-bold rounded-full shadow-lg shadow-red-500/20 min-w-[1.5rem] flex items-center justify-center">
-          {unreadCount > 99 ? '99+' : unreadCount}
-        </div>
       )}
     </div>
   );

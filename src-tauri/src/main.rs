@@ -288,11 +288,11 @@ fn main() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            #[cfg(debug_assertions)]
-            {
-                
+            // Force no decorations at the OS level before window is shown
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_decorations(false);
             }
-            
+
             let app_handle = app.handle().clone();
 
             tauri::async_runtime::spawn(async move {

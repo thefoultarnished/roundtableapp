@@ -1053,7 +1053,7 @@ export default function ChatArea() {
         )}
 
         {/* Message input footer */}
-        <footer className="p-5 flex-shrink-0 bg-gradient-to-t from-slate-950 via-slate-900/80 to-transparent">
+        <footer className="p-5 flex-shrink-0 chat-footer">
           <form onSubmit={handleSubmit}>
             <div className={`flex items-end rounded-app overflow-visible transition-all duration-300 relative z-0 ${
               inputFocused

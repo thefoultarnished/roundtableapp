@@ -39,6 +39,13 @@
             "core:window:allow-set-overlay-icon",
             "core:window:allow-set-progress-bar",
             "core:window:allow-set-effects",
+            "core:window:allow-set-decorations",
+            "core:window:allow-set-fullscreen",
+            "core:window:allow-is-fullscreen",
+            "core:window:allow-set-size",
+            "core:window:allow-set-position",
+            "core:window:allow-outer-size",
+            "core:window:allow-outer-position",
             "core:window:default"
           ]
         },
