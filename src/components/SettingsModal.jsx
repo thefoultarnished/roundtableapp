@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useNetwork } from '../hooks/useNetwork';
 import GlassDropdown from './GlassDropdown';
 import { setCachedProfilePic } from '../utils/profilePictureCache';
+import { applyAcrylicEffect } from '../hooks/useTauriIntegration';
 
 export default function SettingsModal() {
   const { state, dispatch, online } = useAppContext();
@@ -24,7 +25,9 @@ export default function SettingsModal() {
   const [windowTransparency, setWindowTransparency] = useState(true);
   const [transparencyLevel, setTransparencyLevel] = useState(0.75); // UI Glass
   const [windowOpacity, setWindowOpacity] = useState(0.70); // Main Background
-  const [glassBlur, setGlassBlur] = useState(24); // Blur radius in px
+  const [glassBlur, setGlassBlur] = useState(0); // Blur radius in px
+  const [acrylicEffect, setAcrylicEffect] = useState(false);
+  const [acrylicTint, setAcrylicTint] = useState(20);
   const [publicKeyJwk, setPublicKeyJwk] = useState(null);
   const [privateKeyJwk, setPrivateKeyJwk] = useState(null);
 
@@ -49,7 +52,9 @@ export default function SettingsModal() {
       setWindowTransparency(localStorage.getItem('windowTransparency') !== 'false');
       setTransparencyLevel(parseFloat(localStorage.getItem('transparencyLevel') || '0.75'));
       setWindowOpacity(parseFloat(localStorage.getItem('windowOpacity') || '0.70'));
-      setGlassBlur(parseInt(localStorage.getItem('glassBlur') || '24'));
+      setGlassBlur(parseInt(localStorage.getItem('glassBlur') || '0'));
+      setAcrylicEffect(localStorage.getItem('acrylicEffect') === 'true');
+      setAcrylicTint(parseInt(localStorage.getItem('acrylicTint') || '20'));
 
       // Load crypto keys for testing (use same source and naming as useOnlineMode)
       try {
@@ -229,6 +234,9 @@ export default function SettingsModal() {
     localStorage.setItem('transparencyLevel', transparencyLevel);
     localStorage.setItem('windowOpacity', windowOpacity);
     localStorage.setItem('glassBlur', glassBlur);
+    localStorage.setItem('acrylicEffect', acrylicEffect);
+    localStorage.setItem('acrylicTint', acrylicTint);
+    applyAcrylicEffect(acrylicEffect, acrylicTint);
     localStorage.setItem('theme', theme);
 
     // Update AppContext currentUser
@@ -506,6 +514,27 @@ export default function SettingsModal() {
               </div>
             </div>
             <div className="p-3 rounded-2xl bg-white/15 dark:bg-white/5 border border-white/15 dark:border-white/5 backdrop-blur-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <span className={labelClass + ' mb-0'}>Acrylic Blur <span className="text-[8px] text-slate-500 font-normal normal-case tracking-normal">Windows 10/11</span></span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={acrylicEffect} onChange={(e) => {
+                    setAcrylicEffect(e.target.checked);
+                    applyAcrylicEffect(e.target.checked, acrylicTint);
+                  }} className="sr-only peer" />
+                  <div className="w-9 h-5 bg-white/20 dark:bg-white/10 rounded-full peer peer-checked:bg-gradient-to-r peer-checked:from-cyan-500 peer-checked:to-blue-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4 after:shadow-lg" />
+                </label>
+              </div>
+              <div className={`transition-all duration-300 overflow-hidden ${acrylicEffect ? 'opacity-100 max-h-16' : 'opacity-0 max-h-0'}`}>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-[9px] text-slate-400 font-medium">Tint</label>
+                  <span className="text-[9px] font-mono text-slate-500">{acrylicTint}%</span>
+                </div>
+                <input type="range" min="0" max="100" step="5" value={acrylicTint} onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  setAcrylicTint(val);
+                  applyAcrylicEffect(true, val);
+                }} className="w-full h-1.5 rounded-full appearance-none bg-white/20 dark:bg-white/10 accent-cyan-500 cursor-pointer" />
+              </div>
               <div className="flex items-center justify-between">
                 <span className={labelClass + ' mb-0'}>Transparency</span>
                 <label className="relative inline-flex items-center cursor-pointer">

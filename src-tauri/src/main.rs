@@ -266,6 +266,21 @@ impl DiscoveryMessage {
     }
 }
 
+#[tauri::command]
+fn set_acrylic_effect(window: tauri::Window, enable: bool) {
+    use tauri::window::{Color, Effect, EffectState, EffectsBuilder};
+    if enable {
+        let effects = EffectsBuilder::new()
+            .effect(Effect::Acrylic)
+            .state(EffectState::Active)
+            .color(Color(0, 0, 0, 50))
+            .build();
+        let _ = window.set_effects(effects);
+    } else {
+        let _ = window.set_effects(None);
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
@@ -301,7 +316,8 @@ fn main() {
             initiate_file_offer,
     respond_to_file_offer,
     start_file_transfer,
-    download_file
+    download_file,
+    set_acrylic_effect
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

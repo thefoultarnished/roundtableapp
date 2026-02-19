@@ -36,7 +36,8 @@ function AppContent() {
     const savedTheme = localStorage.getItem('theme') || 'aurora';
     const isTransparent = localStorage.getItem('windowTransparency') !== 'false';
     const winOpacity = parseFloat(localStorage.getItem('windowOpacity') || '0.70');
-    
+    const isAcrylic = localStorage.getItem('acrylicEffect') === 'true';
+
     // 1. Sync Theme Classes
     document.documentElement.classList.remove('dark', 'aurora');
     if (savedTheme === 'dark') document.documentElement.classList.add('dark');
@@ -46,15 +47,15 @@ function AppContent() {
     const root = document.getElementById('root');
     if (!root) return;
 
-    if (savedTheme === 'aurora') {
-      // Aurora MUST be transparent to show the animated layers behind it
+    if (savedTheme === 'aurora' || isAcrylic) {
+      // Aurora and acrylic MUST be fully transparent so the OS effect shows through
       root.style.background = 'transparent';
-      document.documentElement.style.background = 'transparent'; // Force html transparent
-      document.body.style.background = 'transparent'; // Force body transparent
+      document.documentElement.style.background = 'transparent';
+      document.body.style.background = 'transparent';
     } else if (isTransparent) {
       const isDark = savedTheme === 'dark';
-      root.style.background = isDark 
-        ? `rgba(2, 6, 23, ${winOpacity})` 
+      root.style.background = isDark
+        ? `rgba(2, 6, 23, ${winOpacity})`
         : `rgba(235, 238, 244, ${winOpacity})`;
     } else {
       const isDark = savedTheme === 'dark';
@@ -82,9 +83,6 @@ function AppContent() {
     <div className="h-screen flex flex-row overflow-hidden relative" style={{ gap: 'var(--layout-spacing)' }}>
       {/* Splash Screen Overlay */}
       <SplashScreen isVisible={splashVisible} />
-
-      {/* Full-screen backdrop blur — blurs OS desktop visible through transparent window */}
-      <div className="fixed inset-0 pointer-events-none" style={{ backdropFilter: 'blur(var(--glass-blur))', WebkitBackdropFilter: 'blur(var(--glass-blur))', zIndex: 0 }} />
 
       {/* Animated background layers */}
       <AuroraBackground />

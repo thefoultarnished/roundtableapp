@@ -2,6 +2,32 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import * as utils from '../utils';
 
+export async function applyAcrylicEffect(enable, tint) {
+  // Immediately update HTML background so OS effect is visible
+  const root = document.getElementById('root');
+  if (root && enable) {
+    root.style.background = 'transparent';
+    document.documentElement.style.background = 'transparent';
+    document.body.style.background = 'transparent';
+  }
+
+  if (!window.__TAURI__?.window) return;
+  try {
+    const win = window.__TAURI__.window.getCurrentWindow();
+    if (enable) {
+      // tint is 0-100; map to color.a 0-200 (0 = fully clear blur, 200 = heavily tinted)
+      const tintVal = tint !== undefined ? tint : parseInt(localStorage.getItem('acrylicTint') || '20');
+      const alpha = Math.round((tintVal / 100) * 200);
+      await win.setEffects({ effects: ['acrylic'], state: 'active', color: [0, 0, 0, alpha] });
+    } else {
+      await win.clearEffects();
+    }
+  } catch (e) {
+    console.warn('Acrylic effect error:', e);
+  }
+}
+
+
 const avatarGradients = [
   'from-teal-400 to-blue-500',
   'from-pink-500 to-purple-600',
@@ -52,8 +78,13 @@ export function useTauriIntegration() {
     if (savedChatFont) document.documentElement.style.setProperty('--chat-font', savedChatFont);
 
     // Load saved blur radius
-    const savedBlur = localStorage.getItem('glassBlur') || '24';
+    const savedBlur = parseInt(localStorage.getItem('glassBlur') || '0');
     document.documentElement.style.setProperty('--glass-blur', savedBlur + 'px');
+
+    // Apply acrylic effect if user had it enabled
+    if (localStorage.getItem('acrylicEffect') === 'true') {
+      applyAcrylicEffect(true);
+    }
   }, []);
 
   // Setup Tauri integration
