@@ -506,8 +506,6 @@ export function AppProvider({ children }) {
             );
           }
 
-          console.log(`🗄️ IndexedDB - loaded ${totalMessages} msgs across ${Object.keys(cachedMessages).length} conversations (${decryptedCount} decrypted, ${failedCount} failed)`);
-
           // Use PREPEND_MESSAGES per-user so we merge with existing state instead of
           // replacing it — avoids the blink caused by SET_MESSAGES wiping in-memory messages.
           for (const [userId, messages] of Object.entries(decryptedMessages)) {
@@ -520,8 +518,6 @@ export function AppProvider({ children }) {
         // Load conversation metadata (unread counts, last message times)
         const metadata = await loadConversationMetadata();
         if (Object.keys(metadata).length > 0) {
-          console.log(`🗄️ IndexedDB - Loaded metadata for ${Object.keys(metadata).length} conversations`);
-          // Update unread counts
           const unreadCounts = {};
           Object.keys(metadata).forEach(friendId => {
             unreadCounts[friendId] = metadata[friendId].unreadCount || 0;
@@ -529,7 +525,7 @@ export function AppProvider({ children }) {
           dispatch({ type: 'SET_UNREAD_COUNTS', payload: unreadCounts });
         }
 
-        console.log('🗄️ IndexedDB - ✅ Cache loading complete');
+        console.log(`🗄️ IndexedDB ✅ ${totalMessages} msgs (${decryptedCount} decrypted, ${failedCount} failed) across ${Object.keys(cachedMessages).length} conversations`);
       } catch (err) {
         console.error('🗄️ IndexedDB - ❌ Failed to load cached data:', err);
       }
@@ -543,7 +539,6 @@ export function AppProvider({ children }) {
   // Load when user logs in (currentUser changes from null to user)
   useEffect(() => {
     if (state.currentUser?.username) {
-      console.log('🗄️ IndexedDB - Triggering load after login');
       loadEncryptedMessages();
     }
   }, [state.currentUser?.username, loadEncryptedMessages]); // Watch for login

@@ -101,9 +101,6 @@ export async function cacheProfilePictureBlob(userId, minioUrl, serverTimestamp,
 export async function getCachedProfilePictureBlob(userId) {
   try {
     const record = await getProfilePictureBlob(userId);
-    if (record) {
-      console.log(`📸 Retrieved cached blob for ${userId}`);
-    }
     return record;
   } catch (error) {
     console.error(`📸 Failed to get cached blob for ${userId}:`, error);
@@ -146,12 +143,6 @@ export async function isCacheValid(userId, serverTimestamp) {
 
     // Check if cached timestamp >= server timestamp
     const isValid = meta.timestamp >= serverTimestamp;
-
-    if (isValid) {
-      console.log(`📸 Cache valid for ${userId} (cached: ${meta.timestamp}, server: ${serverTimestamp})`);
-    } else {
-      console.log(`📸 Cache stale for ${userId} (cached: ${meta.timestamp}, server: ${serverTimestamp})`);
-    }
 
     return isValid;
   } catch (error) {
@@ -288,7 +279,6 @@ export async function migrateFromLocalStorage() {
     const profilePicKeys = keys.filter(key => key.startsWith('profilePic_'));
 
     if (profilePicKeys.length === 0) {
-      console.log('📸 No localStorage entries to migrate');
       return;
     }
 
@@ -310,7 +300,6 @@ export async function migrateFromLocalStorage() {
         // Check if already in IndexedDB
         const existing = await getCachedProfilePictureBlob(userId);
         if (existing) {
-          console.log(`📸 Skipping ${userId} (already in IndexedDB)`);
           continue;
         }
 
@@ -330,7 +319,9 @@ export async function migrateFromLocalStorage() {
       }
     }
 
-    console.log(`📸 Migration complete: ${migratedCount} migrated, ${failedCount} failed`);
+    if (migratedCount > 0 || failedCount > 0) {
+      console.log(`📸 Migration complete: ${migratedCount} migrated, ${failedCount} failed`);
+    }
   } catch (error) {
     console.error('📸 Migration failed:', error);
   }

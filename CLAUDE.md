@@ -6,13 +6,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Roundtable** is a peer-to-peer LAN messenger application built with:
+**Roundtable** is primarily an **internet-based end-to-end encrypted messenger** (think Signal/Telegram), built with:
 - **Frontend**: React 19 + TailwindCSS (glassmorphic UI with aurora animations)
-- **Backend**: Rust async runtime (Tokio) with UDP/TCP networking
+- **Backend**: Rust async runtime (Tokio) via Tauri — handles desktop integration only, NOT networking
 - **Desktop Framework**: Tauri 2.0 (cross-platform desktop app)
-- **Key Features**: Zero-configuration discovery, real-time messaging, file sharing, session logging, custom themes
+- **Relay Server**: WebSocket server at `ws://129.154.231.157:8080` (configurable via localStorage `relayServerUrl`)
+- **Key Features**: E2EE messaging, friends system, read receipts, profile pictures, message history, online presence
 
-The app implements a modern take on the IPMSG protocol for local network communication without internet dependency.
+### How Online Mode Works
+- Connects to a **WebSocket relay server** on startup, auto-reconnects every 5s on drop
+- **Auth**: Users sign up/log in with username + password; server issues a `userId`
+- **E2EE**: Keypairs are derived deterministically from username+password (ECDH). Messages encrypted with AES-GCM. The server routes but cannot decrypt messages
+- **Friends system**: Send/accept/decline friend requests by username; friend list persisted server-side
+- **Message history**: Stored on server + cached locally in IndexedDB (encrypted). Supports pagination
+- **Presence**: Server broadcasts online/offline status to all users
+- **Read receipts**: `message_delivery_confirmation` and `message_read_confirmation` from server
+- **Profile pictures**: Base64-encoded, synced via server, cached in localStorage + IndexedDB
+
+### Key Server Message Types
+| Message | Purpose |
+|---|---|
+| `identify` | Register with server (username, public key, password) |
+| `message` | Send encrypted chat message |
+| `get_chat_history` | Fetch past messages with a user |
+| `message_read` | Send read receipt |
+| `send_friend_request` / `accept_friend_request` / `decline_friend_request` | Friend management |
+| `get_friends_list` / `get_friend_requests` / `get_sent_friend_requests` | Fetch friend data |
+| `update_profile_picture` | Upload profile picture |
+| `user_logout` | Notify server of logout |
+
+> **Note**: LAN/IPMSG mode exists as a secondary feature but is NOT the primary use case. The Rust backend handles LAN networking only; all online mode logic is in the React frontend.
 
 ## Development Commands
 
